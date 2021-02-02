@@ -1,8 +1,8 @@
 import Dependencies._
 
-ThisBuild / scalaVersion     := "2.13.4"
-ThisBuild / version          := "0.1.0-SNAPSHOT"
-ThisBuild / organization     := "com.cheriot"
+ThisBuild / scalaVersion := "2.13.4"
+ThisBuild / version := "0.1.0-SNAPSHOT"
+ThisBuild / organization := "com.cheriot"
 ThisBuild / organizationName := "cheriot"
 
 val zioLoggingVersion = "0.5.6"
@@ -19,7 +19,12 @@ lazy val root = (project in file("."))
     libraryDependencies += "dev.zio" %% "zio-test-sbt" % zioVersion,
     libraryDependencies += "dev.zio" %% "zio-interop-cats" % zioCatsVersion,
     libraryDependencies += "dev.zio" %% "zio-logging" % zioLoggingVersion,
-    libraryDependencies += "com.goyeau" % "kubernetes-client_2.13" % kubeClientVersion
+    libraryDependencies += "dev.zio" %% "zio-logging-slf4j" % zioLoggingVersion,
+    libraryDependencies += "dev.zio" %% "zio-logging-slf4j-bridge" % zioLoggingVersion,
+    libraryDependencies += "com.goyeau" % "kubernetes-client_2.13" % kubeClientVersion excludeAll (
+      ExclusionRule(organization = "ch.qos.logback")
+    ),
+    libraryDependencies += "org.rogach" %% "scallop" % "4.0.2"
   )
 
 // See https://www.scala-sbt.org/1.x/docs/Using-Sonatype.html for instructions on how to publish to Sonatype.

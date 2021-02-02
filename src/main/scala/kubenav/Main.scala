@@ -3,8 +3,10 @@ package kubenav
 import io.chrisdavenport.log4cats
 import zio._
 import zio.logging._
+import zio.logging.slf4j._
 import com.goyeau.kubernetes.client._
 import io.k8s.api.core.v1.NamespaceList
+import io.k8s.api.core.v1.Namespace
 
 package object kubenav {
   implicit def zioCatsLogger(implicit
@@ -73,18 +75,60 @@ package object kubenav {
 
 object Main extends zio.App {
   import kubenav._
+  import org.rogach.scallop._
 
-  val env =
-    Logging.consoleErr()
+  class CommandLineArgs(args: Seq[String]) extends ScallopConf(args) {
+    val logLevel = choice(
+      default = Some(defaultLogLevel.render),
+      choices = logLevels.map(_.render),
+      descr = "Log level of kubenav client."
+    )
+  }
 
-  override def run(args: List[String]): ZIO[ZEnv, Nothing, zio.ExitCode] =
+  val defaultLogLevel = LogLevel.Info
+  val logLevels = List(
+    LogLevel.Off,
+    LogLevel.Trace,
+    LogLevel.Debug,
+    LogLevel.Info,
+    LogLevel.Warn,
+    LogLevel.Error,
+    LogLevel.Fatal
+  )
+  def matchLogLevel(levelName: String): Option[LogLevel] =
+    logLevels.find(_.render == levelName)
+
+  override def run(args: List[String]): ZIO[ZEnv, Nothing, zio.ExitCode] = {
+    val parsedArgs = new CommandLineArgs(args)
+    parsedArgs.verify()
+
+    val logLevel = parsedArgs.logLevel.toOption
+      .flatMap(matchLogLevel)
+      // Ignore this error. Scallop will validate and default the user provided levelName
+      .getOrElse(defaultLogLevel)
+
+    val logging = Logging.consoleErr(
+      logLevel = logLevel,
+      format = LogFormat.ColoredLogFormat()
+    ) >>> Logging.withRootLoggerName("kubenav-cli")
+
     namespaceList
+      .flatMap { names =>
+        log.info(names.mkString(", "))
+      }
       .fold(_ => zio.ExitCode.failure, _ => zio.ExitCode.success)
-      .provideLayer(KubeRepo.live)
-      .provideLayer(env)
+      .provideSomeLayer(KubeRepo.live)
+      .provideLayer(logging)
+  }
 
-  def namespaceList: ZIO[KubeRepo, Throwable, NamespaceList] =
-    KubeRepo.use[NamespaceList] { client =>
-      client.namespaces.list
-    }
+  def namespaceList: ZIO[KubeRepo, Throwable, List[String]] =
+    KubeRepo
+      .use[List[String]] { client =>
+        client.namespaces.list.map(nameStrings)
+      }
+
+  def nameStrings(nsList: NamespaceList): List[String] =
+    nsList.items.map { n: Namespace =>
+      n.metadata.flatMap(_.name).getOrElse("[unnamed]")
+    }.toList
 }
