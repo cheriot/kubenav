@@ -3,7 +3,7 @@ package kubenav
 import zio._
 import zio.console._
 import zio.logging._
-import kube.KubeRepo
+import kube.KubeClient
 import io.k8s.api.core.v1.NamespaceList
 import io.k8s.api.core.v1.Namespace
 
@@ -12,7 +12,7 @@ object Main extends zio.App {
   override def run(args: List[String]): ZIO[ZEnv, Nothing, zio.ExitCode] = {
     val cliArgs = cli.parse(args)
 
-    val env = KnEnv.loggingLayer(cliArgs.logLevel) >>> KubeRepo.live
+    val env = KnEnv.loggingLayer(cliArgs.logLevel) >>> KubeClient.live
 
     namespaceList
       .flatMap { names =>
@@ -22,8 +22,8 @@ object Main extends zio.App {
       .provideSomeLayer(env)
   }
 
-  def namespaceList: ZIO[KubeRepo, Throwable, List[String]] =
-    KubeRepo
+  def namespaceList: ZIO[KubeClient, Throwable, List[String]] =
+    KubeClient
       .use[List[String]] { client =>
         client.namespaces.list.map(nameStrings)
       }

@@ -4,7 +4,7 @@ import zio._
 import zio.logging._
 import com.goyeau.kubernetes.client._
 
-object KubeRepo {
+object KubeClient {
   implicit def zioCatsLogger(implicit
     zlog: zio.logging.Logger[String]
   ) = new log4cats.Logger[Task] {
@@ -39,7 +39,7 @@ object KubeRepo {
     def use[A](f: KubernetesClient[Task] => Task[A]): ZIO[Any, Throwable, A]
   }
 
-  val live: ZLayer[Logging, Nothing, KubeRepo] = ZLayer.fromService { implicit logging =>
+  val live: ZLayer[Logging, Nothing, KubeClient] = ZLayer.fromService { implicit logging =>
     new Service {
       override def use[A](
         f: KubernetesClient[Task] => Task[A]
@@ -60,7 +60,7 @@ object KubeRepo {
 
   def use[A](
     f: KubernetesClient[Task] => Task[A]
-  ): ZIO[KubeRepo, Throwable, A] = {
+  ): ZIO[KubeClient, Throwable, A] = {
     ZIO.accessM(_.get.use(f))
   }
 }
