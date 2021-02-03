@@ -2,6 +2,7 @@ package kubenav
 
 import io.chrisdavenport.log4cats
 import zio._
+import zio.console._
 import zio.logging._
 import zio.logging.slf4j._
 import com.goyeau.kubernetes.client._
@@ -85,7 +86,7 @@ object Main extends zio.App {
     )
   }
 
-  val defaultLogLevel = LogLevel.Info
+  val defaultLogLevel = LogLevel.Error
   val logLevels = List(
     LogLevel.Off,
     LogLevel.Trace,
@@ -112,13 +113,14 @@ object Main extends zio.App {
       format = LogFormat.ColoredLogFormat()
     ) >>> Logging.withRootLoggerName("kubenav-cli")
 
+    val env = logging >>> KubeRepo.live
+
     namespaceList
       .flatMap { names =>
-        log.info(names.mkString(", "))
+        putStrLn(names.mkString(", "))
       }
       .fold(_ => zio.ExitCode.failure, _ => zio.ExitCode.success)
-      .provideSomeLayer(KubeRepo.live)
-      .provideLayer(logging)
+      .provideSomeLayer(env)
   }
 
   def namespaceList: ZIO[KubeRepo, Throwable, List[String]] =
