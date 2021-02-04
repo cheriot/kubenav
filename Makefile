@@ -17,3 +17,10 @@ blank:
 # docker exec 14d44c7be6b1 journalctl -xe
 events:
 	kubectl get events --sort-by=.metadata.creationTimestamp
+
+# See .scalafix.conf and .scalafmt.conf
+fix:
+	sbt scalafixAll scalafmtAll
+
+run:
+	bloop run root -- --log-level debug

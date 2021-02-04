@@ -1,8 +1,9 @@
 package kubenav
 
-import KnEnv._
 import org.rogach.scallop._
 import zio.logging._
+
+import KnEnv._
 
 package object cli {
 

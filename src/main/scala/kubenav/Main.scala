@@ -1,11 +1,11 @@
 package kubenav
 
+import io.k8s.api.core.v1.Namespace
+import io.k8s.api.core.v1.NamespaceList
 import zio._
 import zio.console._
-import zio.logging._
+
 import kube.KubeClient
-import io.k8s.api.core.v1.NamespaceList
-import io.k8s.api.core.v1.Namespace
 
 object Main extends zio.App {
 
@@ -25,7 +25,7 @@ object Main extends zio.App {
   def namespaceList: ZIO[KubeClient, Throwable, List[String]] =
     KubeClient
       .use[List[String]] { client =>
-        client.namespaces.list.map(nameStrings)
+        client.namespaces.list().map(nameStrings)
       }
 
   def nameStrings(nsList: NamespaceList): List[String] =

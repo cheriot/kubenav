@@ -1,8 +1,8 @@
 package kubenav.kube
+import com.goyeau.kubernetes.client._
 import io.chrisdavenport.log4cats
 import zio._
 import zio.logging._
-import com.goyeau.kubernetes.client._
 
 object KubeClient {
   implicit def zioCatsLogger(implicit
