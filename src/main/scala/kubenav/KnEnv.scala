@@ -2,7 +2,7 @@ package kubenav
 import zio.logging._
 
 object KnEnv {
-  val defaultLogLevel = LogLevel.Error
+  val defaultLogLevel = LogLevel.Fatal
   val logLevels = List(
     LogLevel.Off,
     LogLevel.Trace,

@@ -19,6 +19,11 @@ val zioVersion = "1.0.4"
 val zioCatsVersion = "2.2.0.1"
 
 lazy val root = (project in file("."))
+  .enablePlugins(BuildInfoPlugin)
+  .settings(
+    buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
+    buildInfoPackage := "kubenav"
+  )
   .settings(
     name := "kubenav",
     libraryDependencies += scalaTest % Test,
@@ -33,7 +38,7 @@ lazy val root = (project in file("."))
       // Remove the slf4j backend so zio-logging-slf4j-bridge can feed them into zio-logging.
       ExclusionRule(organization = "ch.qos.logback")
     ),
-    libraryDependencies += "org.rogach" %% "scallop" % "4.0.2"
+    libraryDependencies += "com.github.scopt" %% "scopt" % "4.0.0"
   )
 
 // See https://www.scala-sbt.org/1.x/docs/Using-Sonatype.html for instructions on how to publish to Sonatype.
