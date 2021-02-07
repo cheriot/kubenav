@@ -1,7 +1,8 @@
 package kubenav
 
-import java.io.File
 import zio.logging._
+
+import java.io.File
 
 import KnEnv._
 
