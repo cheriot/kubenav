@@ -1,32 +1,10 @@
-package kubenav
-
+package kubenav.cli
+import kubenav.KnEnv._
 import zio.logging._
 
 import java.io.File
 
-import KnEnv._
-
-package object cli {
-
-  case class CommandLineParams(
-    logLevel: LogLevel,
-    kubeconfig: File,
-    namespace: Option[String],
-    label: Option[String],
-    resourceType: Option[String],
-    resourceName: Option[String]
-  )
-  object CommandLineParams {
-    def apply(): CommandLineParams =
-      CommandLineParams(
-        logLevel = defaultLogLevel,
-        kubeconfig = new File(s"${System.getProperty("user.home")}/.kube/config"),
-        namespace = None,
-        label = None,
-        resourceType = None,
-        resourceName = None
-      )
-  }
+object Parser {
 
   /**
    * Parse command line options. Prefer similarity to the options described in
@@ -38,8 +16,8 @@ package object cli {
    */
   def parse(args: List[String]): CommandLineParams = {
 
-    val parser = new scopt.OptionParser[CommandLineParams](BuildInfo.name) {
-      head("Navigate k8s objects like a graph.", s"(${BuildInfo.version})\n")
+    val parser = new scopt.OptionParser[CommandLineParams](kubenav.BuildInfo.name) {
+      head("Navigate k8s objects like a graph.", s"(${kubenav.BuildInfo.version})\n")
 
       implicit val logLevelRead: scopt.Read[zio.logging.LogLevel] =
         scopt.Read.reads { str =>
@@ -54,19 +32,20 @@ package object cli {
           opt[String]('n', "namespace")
             // TODO: validate https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
             .text("the namespace to scope api-server queries")
-            .action((v, o) => o.copy(namespace = Some(v))),
-          //opt[String]('l', "label")
+            .required()
+            .action((v, o) => o.copy(namespace = v)),
+          //opt[Map[String,String]]('l', "label")
           //  // TODO: validate https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#syntax-and-character-set
           //  .action((v, o) => o.copy(label = Some(v)))
           //  .text("key=value, the label to scope api-server queries"),
           arg[String]("RESOURCE_TYPE")
             .hidden()
-            .action((v, o) => o.copy(resourceType = Some(v)))
+            .action((v, o) => o.copy(resourceType = v))
             .validate(v =>
               if (v == "service") Right(())
               else Left("Only 'service' resources are supported right now")
             ),
-          arg[String]("RESOURCE_NAME").hidden().action((v, o) => o.copy(resourceName = Some(v)))
+          arg[String]("RESOURCE_NAME").hidden().action((v, o) => o.copy(resourceName = v))
         )
 
       opt[LogLevel]("log-level")
@@ -86,5 +65,4 @@ package object cli {
         sys.exit(1)
     }
   }
-
 }

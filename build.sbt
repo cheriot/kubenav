@@ -17,6 +17,7 @@ val zioLoggingVersion = "0.5.6"
 val kubeClientVersion = "0.4.0"
 val zioVersion = "1.0.4"
 val zioCatsVersion = "2.2.0.1"
+val circeVersion = "0.12.3"
 
 lazy val root = (project in file("."))
   .enablePlugins(BuildInfoPlugin)
@@ -38,6 +39,12 @@ lazy val root = (project in file("."))
       // Remove the slf4j backend so zio-logging-slf4j-bridge can feed them into zio-logging.
       ExclusionRule(organization = "ch.qos.logback")
     ),
+    libraryDependencies ++= Seq(
+      "io.circe" %% "circe-core",
+      "io.circe" %% "circe-generic",
+      "io.circe" %% "circe-parser",
+    ).map(_ % circeVersion),
+    libraryDependencies += "io.circe" %% "circe-yaml" % "0.12.0", // This is published for circeVersion. Why is sbt not finding it?
     libraryDependencies += "com.github.scopt" %% "scopt" % "4.0.0"
   )
 
