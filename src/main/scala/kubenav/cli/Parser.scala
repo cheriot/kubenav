@@ -38,6 +38,13 @@ object Parser {
           //  // TODO: validate https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#syntax-and-character-set
           //  .action((v, o) => o.copy(label = Some(v)))
           //  .text("key=value, the label to scope api-server queries"),
+          opt[String]("relation")
+            .text("a RESOURCE_TYPE that is related to the resource specified")
+            .action((v, o) => o.copy(relation = Some(v)))
+            .validate(v =>
+              if (v == "deployment") Right(())
+              else Left("Only 'deployment' is support by --relation so far")
+            ),
           arg[String]("RESOURCE_TYPE")
             .hidden()
             .action((v, o) => o.copy(resourceType = v))

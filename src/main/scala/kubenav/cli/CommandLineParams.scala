@@ -11,6 +11,7 @@ case class CommandLineParams(
   namespace: String,
   resourceType: String,
   resourceName: String,
+  relation: Option[String],
   label: Option[Map[String, String]]
 )
 object CommandLineParams {
@@ -19,8 +20,9 @@ object CommandLineParams {
       logLevel = defaultLogLevel,
       kubeconfig = new File(s"${System.getProperty("user.home")}/.kube/config"),
       namespace = "",
-      label = None,
       resourceType = "",
-      resourceName = ""
+      resourceName = "",
+      relation = None,
+      label = None
     )
 }

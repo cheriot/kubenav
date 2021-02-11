@@ -14,17 +14,18 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: hello-kubernetes-custom
+  name: hello-kubernetes-custom-blue
   namespace: hello
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: hello-kubernetes-custom
+      app-variation: hello-kubernetes-custom-blue
   template:
     metadata:
       labels:
         app: hello-kubernetes-custom
+        app-variation: hello-kubernetes-custom-blue
     spec:
       containers:
       - name: hello-kubernetes
