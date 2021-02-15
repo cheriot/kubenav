@@ -3,6 +3,7 @@ import kubenav.KnEnv._
 import zio.logging._
 
 import java.io.File
+import kubenav.models.k8s.ResourceType
 
 object Parser {
 
@@ -40,17 +41,15 @@ object Parser {
           //  .text("key=value, the label to scope api-server queries"),
           opt[String]("relation")
             .text("a RESOURCE_TYPE that is related to the resource specified")
-            .action((v, o) => o.copy(relation = Some(v)))
+            .action((v, o) => o.copy(relation = ResourceType(v)))
             .validate(v =>
-              if (v == "deployment") Right(())
-              else Left("Only 'deployment' is support by --relation so far")
+              ResourceType(v).toRight(s"Unsupported relation type $v").map(_ => ())
             ),
           arg[String]("RESOURCE_TYPE")
             .hidden()
-            .action((v, o) => o.copy(resourceType = v))
+            .action((v, o) => o.copy(resourceType = ResourceType(v).get))
             .validate(v =>
-              if (v == "service") Right(())
-              else Left("Only 'service' resources are supported right now")
+              ResourceType(v).toRight(s"Unsupported RESOURCE_TYPE $v").map(_ => ())
             ),
           arg[String]("RESOURCE_NAME").hidden().action((v, o) => o.copy(resourceName = v))
         )

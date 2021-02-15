@@ -36,31 +36,35 @@ object KubeClient {
   }
 
   trait Service {
-    def use[A](f: KubernetesClient[Task] => Task[A]): ZIO[Any, Throwable, A]
+    def use[R, B](f: KubernetesClient[Task] => ZIO[R, Throwable, B]): ZIO[R, Throwable, B]
   }
 
   val live: ZLayer[Logging, Nothing, KubeClient] = ZLayer.fromService { implicit logging =>
     new Service {
-      override def use[A](
-        f: KubernetesClient[Task] => Task[A]
-      ): ZIO[Any, Throwable, A] = {
+
+      override def use[R, B](f: KubernetesClient[Task] => ZIO[R, Throwable, B]): ZIO[R, Throwable, B] = {
         import java.io.File
         import zio.interop.catz._
-        Task.concurrentEffectWith { implicit CE =>
+
+        val kubeClientZ = Task.concurrentEffectWith { implicit CE =>
           val kubeClient = KubernetesClient[Task](
             KubeConfig.apply[Task](
               new File(s"${System.getProperty("user.home")}/.kube/config")
             )
           )
-          kubeClient.use(f)
+
+          ZIO.succeed(kubeClient)
         }
+
+        kubeClientZ.flatMap(_.use(f))
       }
+
     }
   }
 
-  def use[A](
-    f: KubernetesClient[Task] => Task[A]
-  ): ZIO[KubeClient, Throwable, A] = {
+  def use[R, A](
+    f: KubernetesClient[Task] => ZIO[KubeClient with R, Throwable, A]
+  ): ZIO[KubeClient with R, Throwable, A] = {
     ZIO.accessM(_.get.use(f))
   }
 }

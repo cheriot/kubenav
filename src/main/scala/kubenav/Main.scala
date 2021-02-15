@@ -1,12 +1,18 @@
 package kubenav
 
+import com.goyeau.kubernetes.client._
+import io.k8s.apimachinery.pkg.apis.meta.v1.{LabelSelector, LabelSelectorRequirement}
 import io.k8s.api.core.v1.Service
 import io.k8s.api.core.v1.ServiceList
 import io.k8s.api.apps.v1.Deployment
+import io.k8s.api.apps.v1.DeploymentList
 import zio._
 import zio.console._
+import zio.logging._
 
 import kube.KubeClient
+import kubenav.models.k8s.ResourceRelations
+import kubenav.models.k8s.ResourceType
 
 object Main extends zio.App {
 
@@ -42,96 +48,80 @@ object Main extends zio.App {
   // pod#metadata#ownerReferences[{kind,name}], pod#metadata#labels
 
   // def ListAndCompareSelector(resourceType: String, selector: Object): Unit
-  case class Relation(
-    origin: String,
-    destination: String
-    // queryType:
-  )
-  val relations = Map(
-    // "service" -> [
 
-    // ]
-  )
+  object K8sTypes {
+    /*
+     * io.k8s types have a lot of convention that's not captured in the type level. These traits bring those shared abilities
+     * into the type system.
+     */
+
+    trait K8sList[T] {
+      def items: Seq[T]
+      def apiVersion: Option[String]
+      def kind: Option[String]
+      def metadata: Option[io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta]
+    }
+    object K8sList {
+      import scala.language.implicitConversions
+
+      implicit def deploymentK8sList(dl: DeploymentList): K8sList[Deployment] =
+        new K8sList[Deployment] {
+          def items: Seq[Deployment] = dl.items
+          def apiVersion: Option[String] = dl.apiVersion
+          def kind: Option[String] = dl.kind
+          def metadata: Option[io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta] = dl.metadata
+        }
+
+    }
+
+    // Valid operators are In, NotIn, Exists and DoesNotExist
+  }
 
   def namespaceList(
     namespace: String,
-    resourceType: String,
+    resourceType: ResourceType,
     resourceName: String,
-    relation: Option[String]
-  ): ZIO[KubeClient, Nothing, Either[String, List[String]]] =
-    KubeClient
-      .use[Either[String, List[String]]] { client =>
-        val resource: ZIO[Any, String, Service] = client.services
-          .namespace(namespace)
-          .get(resourceName)
+    relation: Option[ResourceType]
+  ): ZIO[KubeClient with Logging, Nothing, Either[String, List[String]]] = {
+    val serialized = KubeClient
+      .use[Logging, Either[String, List[String]]] { client =>
+        val result = for {
+          targetRelation <- relation
+          originRelations <- ResourceRelations.known.get(resourceType)
+          filter <- originRelations.get(targetRelation)
+        } yield {
+          DynamicEntrypoint.relation(client, namespace, resourceType, resourceName, targetRelation, filter)
+        }
+
+        import cats.syntax.traverse._
+        import zio.interop.catz._
+
+        val flatZ = result.traverse(identity).map { bar =>
+          bar getOrElse List.empty
+        }
+
+        // serialize
+        flatZ
+          .mapError(e => s"Error $e")
+          .map(
+            _.flatMap(describeK8sObject)
+          )
           .either
-          .map(_.left.map(t => s"Error fetching $resourceType/$resourceName in $namespace"))
-          .absolve
-
-        val relatedResourceO = relation.map { relationType =>
-          val podSelectorZ: ZIO[Any, String, Map[String, String]] = resource
-            .map { service =>
-              val l = for {
-                spec <- service.spec
-                labels <- spec.selector
-              } yield labels
-              l match {
-                case Some(ls) if ls.nonEmpty =>
-                  Right(ls)
-                case _ =>
-                  Left(
-                    s"$resourceType $resourceName does not have pod selectors so we don't know how to find a related $relationType"
-                  )
-              }
-            }
-            .either
-            .map(_.flatMap(identity))
-            .absolve
-
-          val deploymentWithPodLabelsZ: ZIO[Any, String, List[(Deployment, Map[String, String])]] =
-            client.deployments
-              .namespace(namespace)
-              .list()
-              .map { deploymentList =>
-                deploymentList.items.map { deployment =>
-                  (deployment, podTemplateLabels(deployment))
-                }.toList
-              }
-              .mapError(t => s"Error in fetching $relationType in $namespace: ${t.getMessage}")
-
-          for {
-            podSelector <- podSelectorZ
-            deploymentWithPodLabels <- deploymentWithPodLabelsZ
-          } yield {
-            deploymentWithPodLabels.collect {
-              case (deployment, podLabels)
-                  if podSelector.forall(kv => podLabels.toList.contains(kv)) =>
-                deployment
-            }.toList
-          }
-        }
-
-        // Serialize
-        val relatedStringsO = relatedResourceO.map { relatedResourceZ =>
-          relatedResourceZ.map { relatedResource =>
-            relatedResource.flatMap(describeK8sObject).toList
-          }
-        }
-        val resourceStrings = resource.map(describeK8sObject)
-
-        relatedStringsO.getOrElse(resourceStrings).either
       }
-      .either
-      .map(_.left.map(t => s"Unexpected error ${t.getMessage}").flatMap(identity))
 
-  def describeK8sObject(service: Service): List[String] = {
-    import io.circe.generic.auto._, io.circe.syntax._
-    List(service.asJson.spaces4)
+    serialized
+      .flatMapError(t => log.throwable("Error using KubeClient", t).map(_ => "Error communicating with cluster"))
+      .either
+      .map(_.flatMap(identity))
   }
 
-  def describeK8sObject(deployment: Deployment): List[String] = {
+  def describeK8sObject(obj: Any): List[String] = {
     import io.circe.generic.auto._, io.circe.syntax._
-    List(deployment.asJson.spaces4)
+    obj match {
+      case s: Service    => List(s.asJson.spaces4)
+      case d: Deployment => List(d.asJson.spaces4)
+      case _             => List(s"Don't know how to print object $obj")
+    }
   }
 
   def podTemplateLabels(d: Deployment): Map[String, String] = {

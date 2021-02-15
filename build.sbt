@@ -10,7 +10,10 @@ ThisBuild / semanticdbVersion := scalafixSemanticdb.revision
 ThisBuild / scalacOptions ++= Seq(
   "-Wunused:imports", // required by `RemoveUnused` rule
   "-deprecation",
-  "-feature"
+  "-feature",
+  "-unchecked",
+  "-language:postfixOps",
+  "-language:higherKinds",
 )
 
 val zioLoggingVersion = "0.5.6"
@@ -27,14 +30,14 @@ lazy val root = (project in file("."))
   )
   .settings(
     name := "kubenav",
-    libraryDependencies += scalaTest % Test,
     libraryDependencies += "dev.zio" %% "zio" % zioVersion,
-    libraryDependencies += "dev.zio" %% "zio-test" % zioVersion,
-    libraryDependencies += "dev.zio" %% "zio-test-sbt" % zioVersion,
     libraryDependencies += "dev.zio" %% "zio-interop-cats" % zioCatsVersion,
     libraryDependencies += "dev.zio" %% "zio-logging" % zioLoggingVersion,
     libraryDependencies += "dev.zio" %% "zio-logging-slf4j" % zioLoggingVersion,
     libraryDependencies += "dev.zio" %% "zio-logging-slf4j-bridge" % zioLoggingVersion,
+
+    libraryDependencies += "org.typelevel" %% "cats-effect" % "2.2.0" withSources() withJavadoc(),
+
     libraryDependencies += ("com.goyeau" % "kubernetes-client_2.13" % kubeClientVersion).excludeAll(
       // Remove the slf4j backend so zio-logging-slf4j-bridge can feed them into zio-logging.
       ExclusionRule(organization = "ch.qos.logback")
@@ -45,7 +48,11 @@ lazy val root = (project in file("."))
       "io.circe" %% "circe-parser",
     ).map(_ % circeVersion),
     libraryDependencies += "io.circe" %% "circe-yaml" % "0.12.0", // This is published for circeVersion. Why is sbt not finding it?
-    libraryDependencies += "com.github.scopt" %% "scopt" % "4.0.0"
+    libraryDependencies += "com.github.scopt" %% "scopt" % "4.0.0",
+
+    libraryDependencies += "dev.zio" %% "zio-test" % zioVersion % "test",
+    libraryDependencies += "dev.zio" %% "zio-test-sbt" % zioVersion % "test",
+    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework")
   )
 
 // See https://www.scala-sbt.org/1.x/docs/Using-Sonatype.html for instructions on how to publish to Sonatype.
