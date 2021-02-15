@@ -1,14 +1,4 @@
 package kubenav.models.k8s
-
-import io.k8s.api.core.v1.PodSpec
-import io.k8s.api.apps.v1.ReplicaSet
-import io.k8s.api.core.v1.Pod
-import io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
-import io.k8s.apimachinery.pkg.apis.meta.v1.{LabelSelector, LabelSelectorRequirement}
-import io.k8s.api.core.v1.Service
-import io.k8s.api.core.v1.ServiceList
-import io.k8s.api.apps.v1.Deployment
-import io.k8s.api.apps.v1.DeploymentList
 import kubenav.models.k8s.HasPodSelector
 import kubenav.models.k8s.K8sError
 import kubenav.models.k8s.PodLike

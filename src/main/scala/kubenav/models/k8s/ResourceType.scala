@@ -20,6 +20,6 @@ object ResourceType {
       case "deployment"        => Deployment.some
       case "replicaset" | "rs" => ReplicaSet.some
       case "pod" | "po"        => Pod.some
-      case _ => None
+      case _                   => None
     }
 }

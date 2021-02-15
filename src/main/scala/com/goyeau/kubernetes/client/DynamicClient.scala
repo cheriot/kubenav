@@ -10,21 +10,21 @@ object DynamicClient {
 
   def get[F[_]](client: KubernetesClient[F], namespace: String, resourceType: ResourceType, resourceName: String): F[_] = {
     resourceType match {
-      case Namespace => client.namespaces.get(namespace)
-      case Service => client.services.namespace(namespace).get(resourceName)
+      case Namespace  => client.namespaces.get(namespace)
+      case Service    => client.services.namespace(namespace).get(resourceName)
       case Deployment => client.deployments.namespace(namespace).get(resourceName)
       case ReplicaSet => client.replicaSets.namespace(namespace).get(resourceName)
-      case Pod => client.pods.namespace(namespace).get(resourceName)
+      case Pod        => client.pods.namespace(namespace).get(resourceName)
     }
   }
 
-  def list[F[_] : Functor](client: KubernetesClient[F], namespace: String, resourceType: ResourceType): F[List[_]] = {
+  def list[F[_]: Functor](client: KubernetesClient[F], namespace: String, resourceType: ResourceType): F[List[_]] = {
     resourceType match {
-      case Namespace => client.namespaces.list().map(_.items.toList)
-      case Service => client.services.namespace(namespace).list().map(_.items.toList)
+      case Namespace  => client.namespaces.list().map(_.items.toList)
+      case Service    => client.services.namespace(namespace).list().map(_.items.toList)
       case Deployment => client.deployments.namespace(namespace).list().map(_.items.toList)
       case ReplicaSet => client.replicaSets.namespace(namespace).list().map(_.items.toList)
-      case Pod => client.pods.namespace(namespace).list().map(_.items.toList)
+      case Pod        => client.pods.namespace(namespace).list().map(_.items.toList)
     }
   }
 }

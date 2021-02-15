@@ -1,9 +1,9 @@
 package kubenav.cli
 import kubenav.KnEnv._
+import kubenav.models.k8s.ResourceType
 import zio.logging._
 
 import java.io.File
-import kubenav.models.k8s.ResourceType
 
 object Parser {
 
@@ -42,15 +42,15 @@ object Parser {
           opt[String]("relation")
             .text("a RESOURCE_TYPE that is related to the resource specified")
             .action((v, o) => o.copy(relation = ResourceType(v)))
-            .validate(v =>
+            .validate { v =>
               ResourceType(v).toRight(s"Unsupported relation type $v").map(_ => ())
-            ),
+            },
           arg[String]("RESOURCE_TYPE")
             .hidden()
             .action((v, o) => o.copy(resourceType = ResourceType(v).get))
-            .validate(v =>
+            .validate { v =>
               ResourceType(v).toRight(s"Unsupported RESOURCE_TYPE $v").map(_ => ())
-            ),
+            },
           arg[String]("RESOURCE_NAME").hidden().action((v, o) => o.copy(resourceName = v))
         )
 

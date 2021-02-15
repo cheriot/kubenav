@@ -1,20 +1,16 @@
 package kubenav
-
-import com.goyeau.kubernetes.client._
-import io.k8s.apimachinery.pkg.apis.meta.v1.{LabelSelector, LabelSelectorRequirement}
-import io.k8s.api.core.v1.Service
-import io.k8s.api.core.v1.ServiceList
 import io.k8s.api.apps.v1.Deployment
 import io.k8s.api.apps.v1.DeploymentList
+import io.k8s.api.core.v1.Service
+import io.k8s.api.core.v1.ServiceList
+import kubenav.models.k8s.K8sError._
+import kubenav.models.k8s.ResourceRelations
+import kubenav.models.k8s.ResourceType
 import zio._
 import zio.console._
 import zio.logging._
 
-import kubenav.models.k8s.K8sError
-import kubenav.models.k8s.K8sError._
 import kube.KubeClient
-import kubenav.models.k8s.ResourceRelations
-import kubenav.models.k8s.ResourceType
 
 object Main extends zio.App {
 

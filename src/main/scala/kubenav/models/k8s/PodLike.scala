@@ -1,13 +1,8 @@
 package kubenav.models.k8s
-
-import io.k8s.apimachinery.pkg.apis.meta.v1.{LabelSelector, LabelSelectorRequirement}
-import io.k8s.api.core.v1.Service
-import io.k8s.api.core.v1.ServiceList
 import io.k8s.api.apps.v1.Deployment
-import io.k8s.api.apps.v1.DeploymentList
-import io.k8s.api.core.v1.PodSpec
 import io.k8s.api.apps.v1.ReplicaSet
 import io.k8s.api.core.v1.Pod
+import io.k8s.api.core.v1.PodSpec
 import io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
 import kubenav.models.k8s.K8sError
 import kubenav.models.k8s.K8sError._
@@ -61,9 +56,9 @@ object PodLike {
   val fail = OperationNotSupported(this) _
   def dynamic(any: Any): Either[K8sError, PodLike] =
     any match {
-      case d: Deployment => Right(d)
+      case d: Deployment  => Right(d)
       case rs: ReplicaSet => Right(rs)
-      case p: Pod => Right(p)
-      case _          => Left(fail(any))
+      case p: Pod         => Right(p)
+      case _              => Left(fail(any))
     }
 }

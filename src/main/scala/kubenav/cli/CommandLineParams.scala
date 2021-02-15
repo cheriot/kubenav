@@ -1,10 +1,10 @@
 package kubenav.cli
 
 import kubenav.KnEnv._
+import kubenav.models.k8s.ResourceType
 import zio.logging._
 
 import java.io.File
-import kubenav.models.k8s.ResourceType
 
 case class CommandLineParams(
   logLevel: LogLevel,

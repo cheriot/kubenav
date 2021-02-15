@@ -1,10 +1,10 @@
 package kubenav.models.k8s
 
-import io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
-import io.k8s.api.core.v1.Service
 import io.k8s.api.apps.v1.Deployment
-import kubenav.models.k8s.K8sError._
+import io.k8s.api.core.v1.Service
+import io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
 import io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelectorRequirement
+import kubenav.models.k8s.K8sError._
 
 trait HasPodSelector {
   def podSelectors: Option[LabelSelector]
@@ -74,7 +74,7 @@ object HasPodSelector {
     val hasE: Either[K8sError, HasPodSelector] = any match {
       case s: Service    => Right(s)
       case d: Deployment => Right(d)
-      case _ => Left(fail(any))
+      case _             => Left(fail(any))
     }
     hasE.flatMap(
       _.podSelectors.toRight(notFound(any))
