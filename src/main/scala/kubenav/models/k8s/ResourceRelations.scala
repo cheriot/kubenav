@@ -2,6 +2,7 @@ package kubenav.models.k8s
 import kubenav.models.k8s.HasPodSelector
 import kubenav.models.k8s.K8sError
 import kubenav.models.k8s.PodLike
+import kubenav.models.k8s.ResourceType._
 
 object ResourceRelations {
 
@@ -9,8 +10,9 @@ object ResourceRelations {
 
   lazy val known: Map[ResourceType, Map[ResourceType, RelationFilter]] =
     Map(
-      ResourceType.Service -> Map(
-        ResourceType.Deployment -> podSelectorRelation
+      Service -> Map(
+        Deployment -> podSelectorRelation,
+        ReplicaSet -> podSelectorRelation
       )
     )
 

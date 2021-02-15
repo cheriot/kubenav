@@ -1,6 +1,7 @@
 package kubenav
 import io.k8s.api.apps.v1.Deployment
 import io.k8s.api.apps.v1.DeploymentList
+import io.k8s.api.apps.v1.ReplicaSet
 import io.k8s.api.core.v1.Service
 import io.k8s.api.core.v1.ServiceList
 import kubenav.models.k8s.K8sError._
@@ -121,9 +122,10 @@ object Main extends zio.App {
   def describeK8sObject(obj: Any): List[String] = {
     import io.circe.generic.auto._, io.circe.syntax._
     obj match {
-      case s: Service    => List(s.asJson.spaces4)
-      case d: Deployment => List(d.asJson.spaces4)
-      case _             => List(s"Don't know how to print object $obj")
+      case s: Service     => List(s.asJson.spaces4)
+      case d: Deployment  => List(d.asJson.spaces4)
+      case rs: ReplicaSet => List(rs.asJson.spaces4)
+      case _              => List(s"Don't know how to print object $obj")
     }
   }
 
