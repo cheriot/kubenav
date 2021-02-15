@@ -24,3 +24,6 @@ fix:
 
 run:
 	bloop run root -- --log-level debug
+
+sources:
+	sbt updateClassifiers

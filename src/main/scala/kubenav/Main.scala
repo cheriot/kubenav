@@ -2,8 +2,8 @@ package kubenav
 import io.k8s.api.apps.v1.Deployment
 import io.k8s.api.apps.v1.DeploymentList
 import io.k8s.api.apps.v1.ReplicaSet
+import io.k8s.api.core.v1.Pod
 import io.k8s.api.core.v1.Service
-import io.k8s.api.core.v1.ServiceList
 import kubenav.models.k8s.K8sError._
 import kubenav.models.k8s.ResourceRelations
 import kubenav.models.k8s.ResourceType
@@ -12,7 +12,6 @@ import zio.console._
 import zio.logging._
 
 import kube.KubeClient
-import io.k8s.api.core.v1.Pod
 
 object Main extends zio.App {
 
@@ -109,7 +108,7 @@ object Main extends zio.App {
         flatZ
           .mapError(k8sError => s"$k8sError")
           .map(
-            _.flatMap(describeK8sObject)
+            _.flatMap(Serializer.serialize)
           )
           .either
       }
@@ -120,29 +119,55 @@ object Main extends zio.App {
       .map(_.flatMap(identity))
   }
 
-  def describeK8sObject(obj: Any): List[String] = {
+  object Serializer {
+    import io.circe.Json
     import io.circe.generic.auto._, io.circe.syntax._
-    obj match {
-      case s: Service     => List(s.asJson.spaces4)
-      case d: Deployment  => List(d.asJson.spaces4)
-      case rs: ReplicaSet => List(rs.asJson.spaces4)
-      case p: Pod         => List(p.asJson.spaces4)
-      case _              => List(s"Don't know how to print object $obj")
+    import io.k8s.apimachinery.pkg.apis.meta.v1.Time
+
+    import scala.reflect.runtime.universe.runtimeMirror
+    import scala.reflect.ClassTag
+    val mirror = runtimeMirror(getClass.getClassLoader)
+
+    def serialize[T: ClassTag](obj: T): List[String] = {
+      val symbol = mirror.classSymbol(obj.getClass)
+      if (!symbol.isCaseClass) return List(s"Reflection based serialization has only been tested with case classes: ${obj.getClass.getCanonicalName}")
+
+      // This is reasonably likely to blow up. Try it and log errors.
+      List(jsonTraverse(obj).deepDropNullValues.spaces4)
+    }
+
+    def jsonTraverse[T: ClassTag](obj: T): Json = {
+      obj match {
+        // All of the maps are String,String so this should work
+        case m: scala.collection.Map[String, String] => m.asJson
+        case s: scala.collection.Seq[Any]            => s.map(jsonTraverse).asJson
+        case b: Boolean                              => b.asJson
+        case i: Int                                  => i.asJson
+        case f: Float                                => f.asJson
+        case d: Double                               => d.asJson
+        case l: Long                                 => l.asJson
+        case s: String                               => s.asJson
+        case t: Time                                 => t.asJson
+        case None                                    => Json.Null
+        case Some(any)                               => jsonTraverse(any)
+        case _ =>
+          Json.fromFields(jsonObject(obj))
+      }
+    }
+
+    def jsonObject[T: ClassTag](obj: T): Iterable[(String, Json)] = {
+      val symbol = mirror.classSymbol(obj.getClass)
+      lazy val instanceMirror = mirror.reflect(obj)
+      symbol.info.decls.toList
+        .filter(decl => decl.isPublic && decl.isMethod)
+        .map(_.asMethod)
+        .filter(_.isGetter)
+        .map { method =>
+          val v = instanceMirror.reflectMethod(method)()
+          println(s"${v.getClass}")
+          (method.name.toString, jsonTraverse(v))
+        }
     }
   }
 
-  def podTemplateLabels(d: Deployment): Map[String, String] = {
-    val labels = for {
-      spec <- d.spec
-      metadata <- spec.template.metadata
-      labels <- metadata.labels
-    } yield labels
-
-    labels.getOrElse(Map())
-  }
-
-  def nameStrings(nsList: ServiceList): List[String] =
-    nsList.items.map { n: Service =>
-      n.metadata.flatMap(_.name).getOrElse("[unnamed]")
-    }.toList
 }
