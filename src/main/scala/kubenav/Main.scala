@@ -12,6 +12,7 @@ import zio.console._
 import zio.logging._
 
 import kube.KubeClient
+import io.k8s.api.core.v1.Pod
 
 object Main extends zio.App {
 
@@ -125,6 +126,7 @@ object Main extends zio.App {
       case s: Service     => List(s.asJson.spaces4)
       case d: Deployment  => List(d.asJson.spaces4)
       case rs: ReplicaSet => List(rs.asJson.spaces4)
+      case p: Pod         => List(p.asJson.spaces4)
       case _              => List(s"Don't know how to print object $obj")
     }
   }
