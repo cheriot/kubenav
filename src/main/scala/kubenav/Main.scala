@@ -10,6 +10,8 @@ import zio._
 import zio.console._
 import zio.logging._
 
+import kubenav.models.k8s.K8sError
+import kubenav.models.k8s.K8sError._
 import kube.KubeClient
 import kubenav.models.k8s.ResourceRelations
 import kubenav.models.k8s.ResourceType
@@ -96,13 +98,18 @@ object Main extends zio.App {
         import cats.syntax.traverse._
         import zio.interop.catz._
 
-        val flatZ = result.traverse(identity).map { bar =>
-          bar getOrElse List.empty
-        }
+        val flatZ = result
+          .traverse(identity)
+          .map { (r: Option[List[Any]]) =>
+            r.toRight(UnknownRelation(resourceType, relation.get))
+          }
+          .either
+          .map(_.flatMap(identity))
+          .absolve
 
         // serialize
         flatZ
-          .mapError(e => s"Error $e")
+          .mapError(k8sError => s"$k8sError")
           .map(
             _.flatMap(describeK8sObject)
           )
