@@ -13,7 +13,7 @@ case class CommandLineParams(
   resourceType: ResourceType,
   resourceName: String,
   relation: Option[ResourceType],
-  label: Option[Map[String, String]]
+  label: Option[Map[String, String]],
 )
 object CommandLineParams {
   def apply(): CommandLineParams =
@@ -24,6 +24,6 @@ object CommandLineParams {
       resourceType = ResourceType.Pod,
       resourceName = "",
       relation = None,
-      label = None
+      label = None,
     )
 }

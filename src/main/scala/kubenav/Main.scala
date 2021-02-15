@@ -22,7 +22,7 @@ object Main extends zio.App {
       cliArgs.namespace,
       cliArgs.resourceType,
       cliArgs.resourceName,
-      cliArgs.relation
+      cliArgs.relation,
     ).absolve
       .flatMap { (output: List[String]) =>
         putStrLn(("Success!" +: output).mkString("\n"))
@@ -80,7 +80,7 @@ object Main extends zio.App {
     namespace: String,
     resourceType: ResourceType,
     resourceName: String,
-    relation: Option[ResourceType]
+    relation: Option[ResourceType],
   ): ZIO[KubeClient with Logging, Nothing, Either[String, List[String]]] = {
     val serialized = KubeClient
       .use[Logging, Either[String, List[String]]] { client =>

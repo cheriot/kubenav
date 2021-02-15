@@ -12,7 +12,8 @@ object ResourceRelations {
     Map(
       Service -> Map(
         Deployment -> podSelectorRelation,
-        ReplicaSet -> podSelectorRelation
+        ReplicaSet -> podSelectorRelation,
+        Pod -> podSelectorRelation,
       )
     )
 

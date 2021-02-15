@@ -14,13 +14,13 @@ object KnEnv {
     LogLevel.Info,
     LogLevel.Warn,
     LogLevel.Error,
-    LogLevel.Fatal
+    LogLevel.Fatal,
   )
 
   def loggingLayer(logLevel: LogLevel) =
     Logging.consoleErr(
       logLevel = logLevel,
-      format = LogFormat.ColoredLogFormat()
+      format = LogFormat.ColoredLogFormat(),
     ) >>> Logging.withRootLoggerName("kubenav-cli")
 
   def env(cliArgs: CommandLineParams): ZLayer[ZEnv, Nothing, KubeClient with Logging] = {

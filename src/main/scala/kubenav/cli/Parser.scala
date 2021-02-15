@@ -51,7 +51,7 @@ object Parser {
             .validate { v =>
               ResourceType(v).toRight(s"Unsupported RESOURCE_TYPE $v").map(_ => ())
             },
-          arg[String]("RESOURCE_NAME").hidden().action((v, o) => o.copy(resourceName = v))
+          arg[String]("RESOURCE_NAME").hidden().action((v, o) => o.copy(resourceName = v)),
         )
 
       opt[LogLevel]("log-level")

@@ -14,7 +14,7 @@ object DynamicEntrypoint {
     client: KubernetesClient[Task],
     namespace: String,
     resourceType: ResourceType,
-    resourceName: String
+    resourceName: String,
   ): ZIO[Logging, K8sError, Any] = {
 
     val description = s"get $namespace $resourceType $resourceName"
@@ -30,7 +30,7 @@ object DynamicEntrypoint {
   def list(
     client: KubernetesClient[Task],
     namespace: String,
-    resourceType: ResourceType
+    resourceType: ResourceType,
   ): ZIO[Logging, K8sError, List[Any]] = {
 
     import zio.interop.catz._
@@ -54,7 +54,7 @@ object DynamicEntrypoint {
     resourceType: ResourceType,
     resourceName: String,
     relationType: ResourceType,
-    relationFilter: RelationFilter
+    relationFilter: RelationFilter,
   ): ZIO[Logging, K8sError, List[Any]] = {
 
     val queries = get(client, namespace, resourceType, resourceName) <&> list(client, namespace, relationType)
