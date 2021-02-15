@@ -1,9 +1,6 @@
 package kubenav
 import io.k8s.api.apps.v1.Deployment
 import io.k8s.api.apps.v1.DeploymentList
-import io.k8s.api.apps.v1.ReplicaSet
-import io.k8s.api.core.v1.Pod
-import io.k8s.api.core.v1.Service
 import kubenav.models.k8s.K8sError._
 import kubenav.models.k8s.ResourceRelations
 import kubenav.models.k8s.ResourceType
