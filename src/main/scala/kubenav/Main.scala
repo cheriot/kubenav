@@ -22,7 +22,7 @@ object Main extends zio.App {
       cliArgs.relation,
     ).absolve
       .flatMap { (output: List[String]) =>
-        putStrLn(("Success!" +: output).mkString("\n"))
+        putStrLn(output.mkString("\n"))
       }
       .flatMapError { errMsg =>
         putStrLn(s"Error: $errMsg")

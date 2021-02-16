@@ -35,3 +35,28 @@ spec:
         env:
         - name: MESSAGE
           value: I just deployed this on Kubernetes!
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello-kubernetes-custom-green
+  namespace: hello
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app-variation: hello-kubernetes-custom-green
+  template:
+    metadata:
+      labels:
+        app: hello-kubernetes-custom
+        app-variation: hello-kubernetes-custom-green
+    spec:
+      containers:
+      - name: hello-kubernetes
+        image: paulbouwer/hello-kubernetes:1.8
+        ports:
+        - containerPort: 8080
+        env:
+        - name: MESSAGE
+          value: I just deployed this on Kubernetes!

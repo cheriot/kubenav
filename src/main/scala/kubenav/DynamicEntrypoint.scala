@@ -57,6 +57,10 @@ object DynamicEntrypoint {
     relationFilter: RelationFilter,
   ): ZIO[Logging, K8sError, List[Any]] = {
 
+    // Future enhancements:
+    // * allow for a relationship to specify labels to filter the list query
+    // * support for non-namespaced objects
+    // * what are examples of objects that have relationships across namespaces?
     val queries = get(client, namespace, resourceType, resourceName) <&> list(client, namespace, relationType)
     val filtered = queries map { case (resource, relations) =>
       relationFilter(resource, relations)

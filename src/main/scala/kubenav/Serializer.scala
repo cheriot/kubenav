@@ -51,7 +51,6 @@ object Serializer {
       .filter(_.isGetter)
       .map { method =>
         val v = instanceMirror.reflectMethod(method)()
-        println(s"${v.getClass}")
         (method.name.toString, jsonTraverse(v))
       }
   }
