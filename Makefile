@@ -27,3 +27,6 @@ run:
 
 sources:
 	sbt updateClassifiers
+
+js:
+	sbt fastLinkJS

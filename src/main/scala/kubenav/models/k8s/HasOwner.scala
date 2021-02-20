@@ -1,9 +1,9 @@
 package kubenav.models.k8s
 
-import kubenav.models.k8s.K8sError._
-import io.k8s.api.core.v1.Pod
-import io.k8s.api.apps.v1.ReplicaSet
 import cats.data.NonEmptyList
+import io.k8s.api.apps.v1.ReplicaSet
+import io.k8s.api.core.v1.Pod
+import kubenav.models.k8s.K8sError._
 
 trait HasOwner {
   def ownerUid: List[Uid]

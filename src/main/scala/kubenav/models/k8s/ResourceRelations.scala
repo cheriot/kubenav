@@ -4,7 +4,6 @@ import kubenav.models.k8s.HasPodSelector
 import kubenav.models.k8s.K8sError
 import kubenav.models.k8s.PodLike
 import kubenav.models.k8s.ResourceType._
-import cats.data.NonEmptyList
 
 object ResourceRelations {
 

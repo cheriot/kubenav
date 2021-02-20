@@ -2,7 +2,6 @@ package kubenav.models.k8s
 
 case class Uid(val underlying: String) extends AnyVal
 object Uid {
-  import scala.language.implicitConversions
 
   implicit val orderingUid: cats.Order[Uid] =
     new cats.Order[Uid] {

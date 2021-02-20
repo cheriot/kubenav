@@ -57,8 +57,9 @@ object Parser {
       opt[LogLevel]("log-level")
         .action((v, o) => o.copy(logLevel = v))
         .text("One of error, warn, info, debug, trace")
-      opt[File]("kubeconfig")
-        .text("Path to the kubeconfig file to use. Defaults to ~/.kube/config")
+      // scopt.Read[java.io.File] does not exist in scalajs out of the box. Reimplement
+      // opt[File]("kubeconfig")
+      //   .text("Path to the kubeconfig file to use. Defaults to ~/.kube/config")
       help("help").hidden()
 
     }

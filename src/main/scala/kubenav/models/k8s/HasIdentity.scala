@@ -1,9 +1,9 @@
 package kubenav.models.k8s
 
-import kubenav.models.k8s.K8sError._
 import io.k8s.api.apps.v1.Deployment
 import io.k8s.api.apps.v1.ReplicaSet
 import io.k8s.api.core.v1.Pod
+import kubenav.models.k8s.K8sError._
 
 trait HasIdentity {
   def uid: Option[Uid]
