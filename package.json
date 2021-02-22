@@ -1,0 +1,25 @@
+{
+  "name": "kubenav",
+  "version": "0.1.0",
+  "description": "1. export JAVA_HOME=\"$(/usr/libexec/java_home -v \"11\")\" 1. brew install sbt kind 1. make cluster-create run",
+  "main": "blessed-test.js",
+  "dependencies": {
+    "blessed": "^0.1.81",
+    "blessed-contrib": "^4.8.21",
+    "buffer-from": "^1.1.1",
+    "source-map": "^0.6.1",
+    "source-map-support": "^0.5.19"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cheriot/kubenav.git"
+  },
+  "author": "",
+  "bugs": {
+    "url": "https://github.com/cheriot/kubenav/issues"
+  },
+  "homepage": "https://github.com/cheriot/kubenav#readme"
+}
