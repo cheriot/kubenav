@@ -5,7 +5,6 @@ import (
 	flags "github.com/jessevdk/go-flags"
 )
 
-// TODO: require kind for get command
 var globalOptions ApplicationOptions
 
 type GenCommandPositionalArgs struct {
@@ -26,11 +25,13 @@ type ApiResourcesCommand struct{}
 
 func (c *ApiResourcesCommand) Execute(_ []string) error {
 	fmt.Printf("Execute ApiResourcesCommand\n")
+	ApiResources(globalOptions.KubeConfig)
 	return nil
 }
 
 type ApplicationOptions struct {
-	Verbose int `long:"verbose" short:"v"`
+	Verbose    int    `long:"verbose" short:"v" description:"Debug level [0,4]"`
+	KubeConfig string `long:"kubeconfig" description:"Absolute path to the kubeconfig file"`
 }
 
 func BuildParser(appOptions *ApplicationOptions) (*flags.Parser, error) {
@@ -64,6 +65,6 @@ func main() {
 		panic(err)
 	}
 
-	// Let go-flats print errors.
+	// Let go-flags print errors.
 	cliParser.Parse()
 }
