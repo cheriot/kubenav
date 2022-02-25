@@ -1,3 +1,16 @@
+precommit: fmt test
+	git status
+
+test:
+	go test -v ./...
+
 fmt:
+	go mod tidy
 	gofmt -w .
-	go vet .
+	goimports --local github.com/cheriot/netpoltool/ -w .
+
+convey:
+	$$(go env GOPATH)/bin/goconvey
+
+run:
+	go run cmd/localserver/main.go
