@@ -14,3 +14,6 @@ convey:
 
 run:
 	go run cmd/localserver/main.go
+
+run-cli:
+	go run cmd/debug/*.go get pod -n back-end

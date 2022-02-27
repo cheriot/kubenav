@@ -24,22 +24,37 @@ func main() {
 	})
 
 	e.GET("/api/context/:ctx/namespaces", func(c echo.Context) error {
-		nsNames, err := app.KubeNamespaceList(c.Request().Context(), c.Param("ctx"))
+		ctx := c.Request().Context()
+		ctxParam := c.Param("ctx")
+
+		kc, err := app.GetOrMakeKubeCluster(ctx, ctxParam)
+		if err != nil {
+			log.Errorf("error getting kubecluster for %s: %w", ctxParam, err)
+		}
+
+		nsNames, err := kc.KubeNamespaceList(ctx)
 		if err != nil {
 			log.Errorf("error from KubeNamespaceList: %w", err)
 		}
 		return c.JSON(http.StatusOK, nsNames)
 	})
 
-	e.POST("/api/context/:ctx/namespace/:ns/default", func(c echo.Context) error {
-		return c.JSON(http.StatusOK, map[string]string{"result": "ok"})
-	})
+	e.GET("/api/context/:ctx/namespace/:ns/query/:query", func(c echo.Context) error {
+		ctx := c.Request().Context()
+		ctxParam := c.Param("ctx")
+		queryParam := c.Param("query")
 
-	e.GET("/api/context/:ctx/namespace/:ns/query", func(c echo.Context) error {
-		return c.JSON(http.StatusOK, map[string][]string{
-			"pods":     {"pod/mything-blue-asdf", "pod/mything-blue-fdsa", "pod/mything-blue-vzbs", "pod/mything-green-hgfd"},
-			"services": {"service/mything", "service/mything-blue", "service/mything-green"},
-		})
+		kc, err := app.GetOrMakeKubeCluster(ctx, ctxParam)
+		if err != nil {
+			log.Errorf("error getting kubecluster for %s: %w", ctxParam, err)
+		}
+
+		matchingResources, err := kc.Query(ctx, queryParam)
+		if err != nil {
+			log.Errorf("error query %s for %s: %w", queryParam, ctxParam, err)
+		}
+
+		return c.JSON(http.StatusOK, matchingResources)
 	})
 
 	e.Logger.Fatal(e.Start(":4000"))

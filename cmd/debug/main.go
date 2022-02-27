@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 
+	"github.com/cheriot/kubenav/internal/app"
+
 	flags "github.com/jessevdk/go-flags"
 )
 
@@ -19,7 +21,9 @@ type GetCommand struct {
 
 func (c *GetCommand) Execute(args []string) error {
 	fmt.Printf("Execute GetCommand %+v %+v %+v\n", globalOptions, c, args)
-	stuff, err := GetResource(globalOptions.KubeConfig, c.PositionalArgs.Kind, c.Namespace)
+	// here
+	// kc, err := app.NewKubeClusterDefault(context.Background())
+	stuff, err := app.QueryResource(globalOptions.KubeConfig, c.PositionalArgs.Kind, c.Namespace)
 	if err != nil {
 		panic(fmt.Sprintf("Unable to execute get command: %s", err.Error()))
 	}
@@ -34,7 +38,7 @@ type ApiResourcesCommand struct{}
 
 func (c *ApiResourcesCommand) Execute(_ []string) error {
 	fmt.Printf("Execute ApiResourcesCommand\n")
-	resources, err := ApiResources(globalOptions.KubeConfig)
+	resources, err := app.ApiResources(globalOptions.KubeConfig)
 	if err != nil {
 		panic(fmt.Sprintf("Unable to execute api-resources command: %s", err.Error()))
 	}
