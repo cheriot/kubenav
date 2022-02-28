@@ -1,11 +1,13 @@
 package app
 
 import (
+	"fmt"
 	"time"
 
+	printers "github.com/cheriot/kubenav/internal/copyofk8sprinters"
+	"github.com/cheriot/kubenav/internal/copyofk8sprinters/internalversion"
+	//k8sprinters "github.com/cheriot/kubenav/internal/copyofk8sprinters/internalversion"
 	util "github.com/cheriot/kubenav/internal/util"
-
-	log "github.com/sirupsen/logrus"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -48,23 +50,22 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	nodev1 "k8s.io/api/node/v1"
-	nodev1beta1 "k8s.io/api/node/v1beta1"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
+	nodev1beta1 "k8s.io/api/node/v1beta1"
 	policyv1 "k8s.io/api/policy/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
+	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
-	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	schedulingv1alpha1 "k8s.io/api/scheduling/v1alpha1"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 )
 
 var schemeBuilder = runtime.SchemeBuilder{
-	apiserverinternalv1alpha1.AddToScheme,
 	appsv1beta1.AddToScheme,
 	autoscalingv2beta1.AddToScheme,
 	batchv1.AddToScheme,
@@ -122,17 +123,53 @@ var schemeBuilder = runtime.SchemeBuilder{
 	storagev1alpha1.AddToScheme,
 }
 
-func PrintList(scheme *runtime.Scheme, resource metav1.APIResource, uList *unstructured.UnstructuredList) (*metav1.Table, error) {
-	// determinte runtime.Type
-	isRegistered := scheme.IsVersionRegistered(toGV(resource))
+func PrintList(scheme *runtime.Scheme, ar metav1.APIResource, uList *unstructured.UnstructuredList) (*metav1.Table, error) {
+	isRegistered := scheme.IsVersionRegistered(toGV(ar))
 	if isRegistered {
-	// convert to runtime.Object instances
-	// use printer if it supports runtime.Type
-		log.Infof("Registered! %v", toGV(resource))
+		table, err := printRegistered(scheme, ar, uList)
+		if err != nil {
+			return nil, fmt.Errorf("printRegistered error: %w", err)
+		}
+		return table, nil
 	}
 
 	// fallback to [name, age] if no printer
 	return printUnstructured(uList)
+}
+
+func PrintError(err error) *metav1.Table {
+	return &metav1.Table{
+		ColumnDefinitions: []metav1.TableColumnDefinition{{Name: "Error"}},
+		Rows: []metav1.TableRow{{Cells: []interface{}{err.Error()}}},
+	}
+}
+
+func printRegistered(scheme *runtime.Scheme, ar metav1.APIResource, uList *unstructured.UnstructuredList) (*metav1.Table, error) {
+	gvk := uList.GetObjectKind().GroupVersionKind()
+
+	typedInstance, err := scheme.New(gvk)
+	if err != nil {
+		return nil, fmt.Errorf("failed New %+v: %w", gvk, err)
+	}
+
+	// Populate typedInstance with the data from uList
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(uList.UnstructuredContent(), typedInstance); err != nil {
+		return nil, fmt.Errorf("unable to convert unstructured object to %v: %w", gvk, err)
+	}
+
+	tableGenerator := printers.NewTableGenerator().With(internalversion.AddHandlers)
+	table, err := tableGenerator.GenerateTable(typedInstance, printers.GenerateOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("unable to GenerateTable for %v: %w", gvk, err)
+	}
+
+	table.Rows = util.Map(table.Rows, func(r metav1.TableRow) metav1.TableRow {
+		// This contains the entire Pod. Don't send it down to the client.
+		r.Object = runtime.RawExtension{}
+		return r
+	})
+
+	return table, nil
 }
 
 func printUnstructured(uList *unstructured.UnstructuredList) (*metav1.Table, error) {

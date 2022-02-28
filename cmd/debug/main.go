@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"context"
 
 	"github.com/cheriot/kubenav/internal/app"
 
@@ -21,13 +22,11 @@ type GetCommand struct {
 
 func (c *GetCommand) Execute(args []string) error {
 	fmt.Printf("Execute GetCommand %+v %+v %+v\n", globalOptions, c, args)
-	// here
-	// kc, err := app.NewKubeClusterDefault(context.Background())
-	stuff, err := app.QueryResource(globalOptions.KubeConfig, c.PositionalArgs.Kind, c.Namespace)
-	if err != nil {
-		panic(fmt.Sprintf("Unable to execute get command: %s", err.Error()))
-	}
-	err = RenderGetResource(stuff)
+
+	kc, err := app.NewKubeClusterDefault(context.Background())
+	resourceTables, err := kc.Query(context.Background(), c.Namespace, c.PositionalArgs.Kind)
+
+	err = RenderResourceTables(resourceTables)
 	if err != nil {
 		panic(fmt.Sprintf("Unable to complete get command: %s", err.Error()))
 	}

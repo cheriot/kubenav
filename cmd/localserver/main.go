@@ -42,6 +42,7 @@ func main() {
 	e.GET("/api/context/:ctx/namespace/:ns/query/:query", func(c echo.Context) error {
 		ctx := c.Request().Context()
 		ctxParam := c.Param("ctx")
+		nsParam := c.Param("ns")
 		queryParam := c.Param("query")
 
 		kc, err := app.GetOrMakeKubeCluster(ctx, ctxParam)
@@ -49,12 +50,12 @@ func main() {
 			log.Errorf("error getting kubecluster for %s: %w", ctxParam, err)
 		}
 
-		matchingResources, err := kc.Query(ctx, queryParam)
+		resourceTables, err := kc.Query(ctx, nsParam, queryParam)
 		if err != nil {
 			log.Errorf("error query %s for %s: %w", queryParam, ctxParam, err)
 		}
 
-		return c.JSON(http.StatusOK, matchingResources)
+		return c.JSON(http.StatusOK, resourceTables)
 	})
 
 	e.Logger.Fatal(e.Start(":4000"))

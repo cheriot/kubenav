@@ -19,34 +19,28 @@ func RenderApiResources(resources []v1.APIResource) error {
 	return nil
 }
 
-func RenderGetResource(response *app.K8sSearchResponse) error {
-	columns := util.Map(response.Table.ColumnDefinitions, func(cd v1.TableColumnDefinition) string {
-		return cd.Name
-	})
-	fmt.Println(strings.Join(columns, "\t"))
+func RenderResourceTables(resourceTables []app.ResourceTable) error {
+	for _, rt := range resourceTables {
+		fmt.Printf("%s/%s.%s\n", rt.APIResource.Group, rt.APIResource.Version, rt.APIResource.Kind)
 
-	for _, tr := range response.Table.Rows {
-		cells := util.Map(tr.Cells, func(cell interface{}) string {
-			switch c := cell.(type) {
-			case string:
-				return c
-			}
-			log.Errorf("unknown type from %+v", cell)
-			return "<unknowntype>"
+		colNames := util.Map(rt.Table.ColumnDefinitions, func(cd v1.TableColumnDefinition) string {
+			return cd.Name
 		})
-		fmt.Println(strings.Join(cells, "\t"))
+		fmt.Println(strings.Join(colNames, "\t"))
+
+		for _, tr := range rt.Table.Rows {
+			cells := util.Map(tr.Cells, func(cell interface{}) string {
+				switch c := cell.(type) {
+				case string:
+					return c
+				default:
+					log.Errorf("unknown type from %+v", cell)
+					return "<unknowntype>"
+				}
+			})
+			fmt.Println(strings.Join(cells, "\t"))
+		}
 	}
 
-	// for _, kr := range response.KindResults {
-	// 	fmt.Printf("%s.%s\n", kr.Resource.Version, kr.Resource.Kind)
-	// 	for _, item := range kr.Results.Items {
-	// 		b, err := json.MarshalIndent(item, "", "  ")
-	// 		if err != nil {
-	// 			fmt.Println(err.Error())
-	// 		}
-
-	// 		fmt.Printf(string(b)) // Make Printf
-	// 	}
-	// }
 	return nil
 }
