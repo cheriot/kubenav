@@ -27,7 +27,6 @@ import (
 
 	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
-	autoscalingv2beta1 "k8s.io/api/autoscaling/v2beta1"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
@@ -58,7 +57,8 @@ import (
 	//"k8s.io/kubernetes/pkg/apis/apps"
 	apps "k8s.io/api/apps/v1"
 	//"k8s.io/kubernetes/pkg/apis/autoscaling"
-	autoscaling "k8s.io/api/autoscaling/v2"
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	//"k8s.io/kubernetes/pkg/apis/batch"
 	batch "k8s.io/api/batch/v1"
 	//"k8s.io/kubernetes/pkg/apis/certificates"
@@ -365,13 +365,25 @@ func AddHandlers(h printers.PrintHandler) {
 	h.TableHandler(deploymentColumnDefinitions, printDeployment)
 	h.TableHandler(deploymentColumnDefinitions, printDeploymentList)
 
+	// Duplicate of V2 sans metrics detail
+	horizontalPodAutoscalerColumnDefinitionsV1 := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Reference", Type: "string", Description: autoscalingv2.HorizontalPodAutoscalerSpec{}.SwaggerDoc()["scaleTargetRef"]},
+		{Name: "MinPods", Type: "string", Description: autoscalingv2.HorizontalPodAutoscalerSpec{}.SwaggerDoc()["minReplicas"]},
+		{Name: "MaxPods", Type: "string", Description: autoscalingv2.HorizontalPodAutoscalerSpec{}.SwaggerDoc()["maxReplicas"]},
+		{Name: "Replicas", Type: "string", Description: autoscalingv2.HorizontalPodAutoscalerStatus{}.SwaggerDoc()["currentReplicas"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	h.TableHandler(horizontalPodAutoscalerColumnDefinitionsV1, printHorizontalPodAutoscalerV1)
+	h.TableHandler(horizontalPodAutoscalerColumnDefinitionsV1, printHorizontalPodAutoscalerListV1)
+
 	horizontalPodAutoscalerColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Reference", Type: "string", Description: autoscalingv2beta1.HorizontalPodAutoscalerSpec{}.SwaggerDoc()["scaleTargetRef"]},
-		{Name: "Targets", Type: "string", Description: autoscalingv2beta1.HorizontalPodAutoscalerSpec{}.SwaggerDoc()["metrics"]},
-		{Name: "MinPods", Type: "string", Description: autoscalingv2beta1.HorizontalPodAutoscalerSpec{}.SwaggerDoc()["minReplicas"]},
-		{Name: "MaxPods", Type: "string", Description: autoscalingv2beta1.HorizontalPodAutoscalerSpec{}.SwaggerDoc()["maxReplicas"]},
-		{Name: "Replicas", Type: "string", Description: autoscalingv2beta1.HorizontalPodAutoscalerStatus{}.SwaggerDoc()["currentReplicas"]},
+		{Name: "Reference", Type: "string", Description: autoscalingv2.HorizontalPodAutoscalerSpec{}.SwaggerDoc()["scaleTargetRef"]},
+		{Name: "Targets", Type: "string", Description: autoscalingv2.HorizontalPodAutoscalerSpec{}.SwaggerDoc()["metrics"]},
+		{Name: "MinPods", Type: "string", Description: autoscalingv2.HorizontalPodAutoscalerSpec{}.SwaggerDoc()["minReplicas"]},
+		{Name: "MaxPods", Type: "string", Description: autoscalingv2.HorizontalPodAutoscalerSpec{}.SwaggerDoc()["maxReplicas"]},
+		{Name: "Replicas", Type: "string", Description: autoscalingv2.HorizontalPodAutoscalerStatus{}.SwaggerDoc()["currentReplicas"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 	h.TableHandler(horizontalPodAutoscalerColumnDefinitions, printHorizontalPodAutoscaler)
@@ -2068,7 +2080,7 @@ func printDeploymentList(list *apps.DeploymentList, options printers.GenerateOpt
 	return rows, nil
 }
 
-func formatHPAMetrics(specs []autoscaling.MetricSpec, statuses []autoscaling.MetricStatus) string {
+func formatHPAMetrics(specs []autoscalingv2.MetricSpec, statuses []autoscalingv2.MetricStatus) string {
 	if len(specs) == 0 {
 		return "<none>"
 	}
@@ -2078,7 +2090,7 @@ func formatHPAMetrics(specs []autoscaling.MetricSpec, statuses []autoscaling.Met
 	count := 0
 	for i, spec := range specs {
 		switch spec.Type {
-		case autoscaling.ExternalMetricSourceType:
+		case autoscalingv2.ExternalMetricSourceType:
 			if spec.External.Target.AverageValue != nil {
 				current := "<unknown>"
 				if len(statuses) > i && statuses[i].External != nil && statuses[i].External.Current.AverageValue != nil {
@@ -2092,13 +2104,13 @@ func formatHPAMetrics(specs []autoscaling.MetricSpec, statuses []autoscaling.Met
 				}
 				list = append(list, fmt.Sprintf("%s/%s", current, spec.External.Target.Value.String()))
 			}
-		case autoscaling.PodsMetricSourceType:
+		case autoscalingv2.PodsMetricSourceType:
 			current := "<unknown>"
 			if len(statuses) > i && statuses[i].Pods != nil {
 				current = statuses[i].Pods.Current.AverageValue.String()
 			}
 			list = append(list, fmt.Sprintf("%s/%s", current, spec.Pods.Target.AverageValue.String()))
-		case autoscaling.ObjectMetricSourceType:
+		case autoscalingv2.ObjectMetricSourceType:
 			if spec.Object.Target.AverageValue != nil {
 				current := "<unknown>"
 				if len(statuses) > i && statuses[i].Object != nil && statuses[i].Object.Current.AverageValue != nil {
@@ -2112,7 +2124,7 @@ func formatHPAMetrics(specs []autoscaling.MetricSpec, statuses []autoscaling.Met
 				}
 				list = append(list, fmt.Sprintf("%s/%s", current, spec.Object.Target.Value.String()))
 			}
-		case autoscaling.ResourceMetricSourceType:
+		case autoscalingv2.ResourceMetricSourceType:
 			if spec.Resource.Target.AverageValue != nil {
 				current := "<unknown>"
 				if len(statuses) > i && statuses[i].Resource != nil {
@@ -2131,7 +2143,7 @@ func formatHPAMetrics(specs []autoscaling.MetricSpec, statuses []autoscaling.Met
 				}
 				list = append(list, fmt.Sprintf("%s/%s", current, target))
 			}
-		case autoscaling.ContainerResourceMetricSourceType:
+		case autoscalingv2.ContainerResourceMetricSourceType:
 			if spec.ContainerResource.Target.AverageValue != nil {
 				current := "<unknown>"
 				if len(statuses) > i && statuses[i].ContainerResource != nil {
@@ -2169,7 +2181,38 @@ func formatHPAMetrics(specs []autoscaling.MetricSpec, statuses []autoscaling.Met
 	return ret
 }
 
-func printHorizontalPodAutoscaler(obj *autoscaling.HorizontalPodAutoscaler, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+func printHorizontalPodAutoscalerV1(obj *autoscalingv1.HorizontalPodAutoscaler, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+
+	reference := fmt.Sprintf("%s/%s",
+		obj.Spec.ScaleTargetRef.Kind,
+		obj.Spec.ScaleTargetRef.Name)
+	minPods := "<unset>"
+	if obj.Spec.MinReplicas != nil {
+		minPods = fmt.Sprintf("%d", *obj.Spec.MinReplicas)
+	}
+	maxPods := obj.Spec.MaxReplicas
+	currentReplicas := obj.Status.CurrentReplicas
+	row.Cells = append(row.Cells, obj.Name, reference, minPods, int64(maxPods), int64(currentReplicas), translateTimestampSince(obj.CreationTimestamp))
+	return []metav1.TableRow{row}, nil
+}
+
+func printHorizontalPodAutoscalerListV1(list *autoscalingv1.HorizontalPodAutoscalerList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printHorizontalPodAutoscalerV1(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+
+func printHorizontalPodAutoscaler(obj *autoscalingv2.HorizontalPodAutoscaler, options printers.GenerateOptions) ([]metav1.TableRow, error) {
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -2188,7 +2231,7 @@ func printHorizontalPodAutoscaler(obj *autoscaling.HorizontalPodAutoscaler, opti
 	return []metav1.TableRow{row}, nil
 }
 
-func printHorizontalPodAutoscalerList(list *autoscaling.HorizontalPodAutoscalerList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+func printHorizontalPodAutoscalerList(list *autoscalingv2.HorizontalPodAutoscalerList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printHorizontalPodAutoscaler(&list.Items[i], options)

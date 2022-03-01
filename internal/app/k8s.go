@@ -13,6 +13,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
@@ -20,7 +21,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
-	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
 // KubeContextList names of contexts from kubeconfig
@@ -38,8 +38,8 @@ type KubeCluster struct {
 	name             string
 	restClientConfig *restclient.Config
 	apiResources     []metav1.APIResource
-	scheme *runtime.Scheme // Could be global
-	dynamicClient dynamic.Interface
+	scheme           *runtime.Scheme // Could be global
+	dynamicClient    dynamic.Interface
 }
 
 func NewKubeClusterDefault(ctx context.Context) (*KubeCluster, error) {
@@ -80,8 +80,8 @@ func NewKubeCluster(ctx context.Context, kubeCtxName string) (*KubeCluster, erro
 		name:             kubeCtxName,
 		restClientConfig: restClientConfig,
 		apiResources:     apiResource,
-		scheme: scheme,
-		dynamicClient: dynamicClient,
+		scheme:           scheme,
+		dynamicClient:    dynamicClient,
 	}, nil
 }
 
@@ -102,9 +102,9 @@ func (kc *KubeCluster) KubeNamespaceList(ctx context.Context) ([]string, error) 
 }
 
 type ResourceTable struct {
-	metav1.APIResource
-	*metav1.Table
-	IsError bool
+	APIResource metav1.APIResource `json:"apiResource"`
+	Table *metav1.Table `json:"table"`
+	IsError bool `json:"isError"`
 }
 
 func (kc *KubeCluster) Query(ctx context.Context, nsName string, query string) ([]ResourceTable, error) {
@@ -119,9 +119,9 @@ func (kc *KubeCluster) Query(ctx context.Context, nsName string, query string) (
 		names = append(names, r.Categories...)
 		return util.Contains(names, strings.ToLower(query))
 	}
-	util.Filter(kc.apiResources, isMatch)
 
 	matches := util.Filter(kc.apiResources, isMatch)
+	log.Infof("matches %v", util.Map(matches, func(ar metav1.APIResource) string { return ar.Kind }))
 
 	results := util.Map(matches, func(r metav1.APIResource) ResourceTable {
 		table, err := kc.ListResource(r, nsName)
@@ -131,11 +131,15 @@ func (kc *KubeCluster) Query(ctx context.Context, nsName string, query string) (
 		}
 		return ResourceTable{
 			APIResource: r,
-			Table: table,
+			Table:       table,
 		}
 	})
 
-	return results, nil
+	nonempty := util.Filter(results, func(rt ResourceTable) bool {
+		return len(rt.Table.Rows) > 0
+	})
+
+	return nonempty, nil
 }
 
 func ApiResources(kubeconfigOverride string) ([]metav1.APIResource, error) {
@@ -260,16 +264,16 @@ func toGVR(r metav1.APIResource) schema.GroupVersionResource {
 }
 
 func toGVK(r metav1.APIResource) schema.GroupVersionKind {
-	return schema.GroupVersionKind {
-		Group: r.Group,
+	return schema.GroupVersionKind{
+		Group:   r.Group,
 		Version: r.Version,
-		Kind: r.Kind,
+		Kind:    r.Kind,
 	}
 }
 
 func toGV(r metav1.APIResource) schema.GroupVersion {
-	return schema.GroupVersion {
-		Group: r.Group,
+	return schema.GroupVersion{
+		Group:   r.Group,
 		Version: r.Version,
 	}
 }
