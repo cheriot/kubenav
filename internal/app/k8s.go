@@ -103,8 +103,8 @@ func (kc *KubeCluster) KubeNamespaceList(ctx context.Context) ([]string, error) 
 
 type ResourceTable struct {
 	APIResource metav1.APIResource `json:"apiResource"`
-	Table *metav1.Table `json:"table"`
-	IsError bool `json:"isError"`
+	Table       *metav1.Table      `json:"table"`
+	IsError     bool               `json:"isError"`
 }
 
 func (kc *KubeCluster) Query(ctx context.Context, nsName string, query string) ([]ResourceTable, error) {

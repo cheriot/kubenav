@@ -6,6 +6,7 @@ import (
 
 	printers "github.com/cheriot/kubenav/internal/copyofk8sprinters"
 	"github.com/cheriot/kubenav/internal/copyofk8sprinters/internalversion"
+
 	//k8sprinters "github.com/cheriot/kubenav/internal/copyofk8sprinters/internalversion"
 	util "github.com/cheriot/kubenav/internal/util"
 
@@ -140,7 +141,7 @@ func PrintList(scheme *runtime.Scheme, ar metav1.APIResource, uList *unstructure
 func PrintError(err error) *metav1.Table {
 	return &metav1.Table{
 		ColumnDefinitions: []metav1.TableColumnDefinition{{Name: "Error"}},
-		Rows: []metav1.TableRow{{Cells: []interface{}{err.Error()}}},
+		Rows:              []metav1.TableRow{{Cells: []interface{}{err.Error()}}},
 	}
 }
 
@@ -189,7 +190,7 @@ func printUnstructured(uList *unstructured.UnstructuredList) (*metav1.Table, err
 
 	return &metav1.Table{
 		ColumnDefinitions: columns,
-		Rows: rows,
+		Rows:              rows,
 	}, nil
 }
 

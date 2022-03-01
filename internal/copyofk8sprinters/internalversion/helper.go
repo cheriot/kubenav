@@ -3,8 +3,8 @@ package internalversion
 import (
 	"strings"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	core "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // GetAccessModesAsString returns a string representation of an array of access modes.
@@ -70,7 +70,6 @@ func ContainsAccessMode(modes []core.PersistentVolumeAccessMode, mode core.Persi
 	}
 	return false
 }
-
 
 // https://github.com/kubernetes/kubernetes/blob/ea0764452222146c47ec826977f49d7001b0ea8c/pkg/apis/storage/util/helpers.go
 const IsDefaultStorageClassAnnotation = "storageclass.kubernetes.io/is-default-class"

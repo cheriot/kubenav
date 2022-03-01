@@ -18,10 +18,11 @@ package internalversion
 
 import (
 	//api "k8s.io/kubernetes/pkg/apis/core"
-	api "k8s.io/api/core/v1"
 	"reflect"
 	"sort"
 	"testing"
+
+	api "k8s.io/api/core/v1"
 )
 
 func TestSortableResourceNamesSorting(t *testing.T) {
