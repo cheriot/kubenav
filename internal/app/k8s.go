@@ -11,6 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -21,6 +22,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
+	"k8s.io/kubectl/pkg/describe"
 )
 
 // KubeContextList names of contexts from kubeconfig
@@ -109,18 +111,7 @@ type ResourceTable struct {
 
 func (kc *KubeCluster) Query(ctx context.Context, nsName string, query string) ([]ResourceTable, error) {
 	log.Infof("Query for %s", query)
-	isMatch := func(r metav1.APIResource) bool {
-		names := []string{
-			strings.ToLower(r.Name),
-			strings.ToLower(r.Kind),
-			strings.ToLower(r.Group),
-			strings.ToLower(r.SingularName),
-		}
-		names = append(names, r.Categories...)
-		return util.Contains(names, strings.ToLower(query))
-	}
-
-	matches := util.Filter(kc.apiResources, isMatch)
+	matches := findAPIResources(kc.apiResources, query)
 	log.Infof("matches %v", util.Map(matches, func(ar metav1.APIResource) string { return ar.Kind }))
 
 	results := util.Map(matches, func(r metav1.APIResource) ResourceTable {
@@ -142,12 +133,67 @@ func (kc *KubeCluster) Query(ctx context.Context, nsName string, query string) (
 	return nonempty, nil
 }
 
+func findAPIResources(apiResources []metav1.APIResource, identifier string) []metav1.APIResource {
+	isMatch := func(r metav1.APIResource) bool {
+		names := []string{
+			strings.ToLower(r.Name),
+			strings.ToLower(r.Kind),
+			strings.ToLower(r.Group),
+			strings.ToLower(r.SingularName),
+		}
+		names = append(names, r.Categories...)
+		return util.Contains(names, strings.ToLower(identifier))
+	}
+
+	return util.Filter(apiResources, isMatch)
+}
+
+func (kc *KubeCluster) Describe(ctx context.Context, nsName string, kind string, resourceName string) (string, error) {
+	matches := findAPIResources(kc.apiResources, kind)
+
+	for _, apiResource := range matches {
+
+		describer, found := describe.DescriberFor(toGK(apiResource), kc.restClientConfig)
+		if !found {
+			var restMapper meta.RESTMapper
+			restMapper = meta.NewDefaultRESTMapper(kc.scheme.PreferredVersionAllGroups()) // Maybe use PrioritizedVersion..?
+			restMapping, err := restMapper.RESTMapping(toGK(apiResource))
+			if err != nil {
+				return "", err
+			}
+
+			describer, found = describe.GenericDescriberFor(restMapping, kc.restClientConfig)
+			if !found {
+				return "", fmt.Errorf("unable to create a GenericDescriberFor %v", apiResource)
+			}
+		}
+
+		return describer.Describe(nsName, resourceName, describe.DescriberSettings{ShowEvents: true, ChunkSize: 5})
+	}
+
+	return "", fmt.Errorf("no resources found matching %s", kind)
+}
+
 func ApiResources(kubeconfigOverride string) ([]metav1.APIResource, error) {
 	config, err := readConfig(kubeconfigOverride)
 	if err != nil {
 		return nil, err
 	}
 	return apiResources(config)
+}
+
+func Describe(ns string, kind string, name string) (string, error) {
+	ctxs, err := KubeContextList()
+	if err != nil {
+		return "", err
+	}
+
+	kc, err := GetOrMakeKubeCluster(context.TODO(), ctxs[0])
+	if err != nil {
+		return "", err
+	}
+
+	return kc.Describe(context.TODO(), ns, kind, name)
 }
 
 func apiResources(restClientConfig *restclient.Config) ([]metav1.APIResource, error) {
@@ -275,5 +321,12 @@ func toGV(r metav1.APIResource) schema.GroupVersion {
 	return schema.GroupVersion{
 		Group:   r.Group,
 		Version: r.Version,
+	}
+}
+
+func toGK(r metav1.APIResource) schema.GroupKind {
+	return schema.GroupKind{
+		Group: r.Group,
+		Kind:  r.Kind,
 	}
 }
