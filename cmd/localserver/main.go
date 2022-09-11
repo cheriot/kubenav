@@ -3,7 +3,7 @@ package main
 import (
 	"net/http"
 
-	"github.com/cheriot/kubenav/internal/app"
+	"github.com/cheriot/kubenav/pkg/app"
 
 	log "github.com/sirupsen/logrus"
 

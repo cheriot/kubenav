@@ -1,6 +1,6 @@
 package internalversion
 
-//Copied from https://pkg.go.dev/k8s.io/kubernetes/pkg/util/node
+// Copied from https://pkg.go.dev/k8s.io/kubernetes/pkg/util/node
 const (
 	// NodeUnreachablePodReason is the reason on a pod when its state cannot be confirmed as kubelet is unresponsive
 	// on the node it is (was) running.

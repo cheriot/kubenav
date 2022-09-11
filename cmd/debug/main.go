@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/cheriot/kubenav/internal/app"
+	"github.com/cheriot/kubenav/pkg/app"
 
 	flags "github.com/jessevdk/go-flags"
 )

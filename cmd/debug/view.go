@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/cheriot/kubenav/internal/app"
-	"github.com/cheriot/kubenav/internal/util"
 	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/cheriot/kubenav/internal/util"
+	"github.com/cheriot/kubenav/pkg/app"
 )
 
 func RenderApiResources(resources []v1.APIResource) error {

@@ -96,6 +96,10 @@ func (t *TestPrintHandler) getNumCalls() int {
 	return t.numCalls
 }
 
+func Ptr[T any](v T) *T {
+	return &v
+}
+
 func TestAllHandlers(t *testing.T) {
 	h := &TestPrintHandler{numCalls: 0}
 	AddHandlers(h)
@@ -2093,7 +2097,7 @@ func TestPrintDeployment(t *testing.T) {
 			CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 		},
 		Spec: apps.DeploymentSpec{
-			Replicas: 5,
+			Replicas: Ptr(int32(5)),
 			Template: api.PodTemplateSpec{
 				Spec: api.PodSpec{
 					Containers: []api.Container{
@@ -4186,7 +4190,7 @@ func TestPrintReplicationController(t *testing.T) {
 					Namespace: "test-namespace",
 				},
 				Spec: api.ReplicationControllerSpec{
-					Replicas: 5,
+					Replicas: Ptr(int32(5)),
 					Selector: map[string]string{"a": "b"},
 					Template: &api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
@@ -4222,7 +4226,7 @@ func TestPrintReplicationController(t *testing.T) {
 					Name: "rc1",
 				},
 				Spec: api.ReplicationControllerSpec{
-					Replicas: 5,
+					Replicas: Ptr(int32(5)),
 					Selector: map[string]string{"a": "b"},
 					Template: &api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
@@ -4281,7 +4285,7 @@ func TestPrintReplicaSet(t *testing.T) {
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
 				Spec: apps.ReplicaSetSpec{
-					Replicas: 5,
+					Replicas: Ptr(int32(5)),
 					Template: api.PodTemplateSpec{
 						Spec: api.PodSpec{
 							Containers: []api.Container{
@@ -4315,7 +4319,7 @@ func TestPrintReplicaSet(t *testing.T) {
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
 				Spec: apps.ReplicaSetSpec{
-					Replicas: 5,
+					Replicas: Ptr(int32(5)),
 					Template: api.PodTemplateSpec{
 						Spec: api.PodSpec{
 							Containers: []api.Container{
@@ -4367,7 +4371,7 @@ func TestPrintReplicaSetList(t *testing.T) {
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
 				Spec: apps.ReplicaSetSpec{
-					Replicas: 5,
+					Replicas: Ptr(int32(5)),
 					Template: api.PodTemplateSpec{
 						Spec: api.PodSpec{
 							Containers: []api.Container{
@@ -4394,7 +4398,7 @@ func TestPrintReplicaSetList(t *testing.T) {
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
 				Spec: apps.ReplicaSetSpec{
-					Replicas: 4,
+					Replicas: Ptr(int32(4)),
 					Template: api.PodTemplateSpec{},
 					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 				},
@@ -4438,7 +4442,7 @@ func TestPrintStatefulSet(t *testing.T) {
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
 				Spec: apps.StatefulSetSpec{
-					Replicas: 5,
+					Replicas: Ptr(int32(5)),
 					Template: api.PodTemplateSpec{
 						Spec: api.PodSpec{
 							Containers: []api.Container{
@@ -4471,7 +4475,7 @@ func TestPrintStatefulSet(t *testing.T) {
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
 				Spec: apps.StatefulSetSpec{
-					Replicas: 5,
+					Replicas: Ptr(int32(5)),
 					Template: api.PodTemplateSpec{
 						Spec: api.PodSpec{
 							Containers: []api.Container{
