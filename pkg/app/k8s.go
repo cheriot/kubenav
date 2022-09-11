@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"path/filepath"
@@ -23,6 +24,8 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 	"k8s.io/kubectl/pkg/describe"
+
+	objprinter "k8s.io/cli-runtime/pkg/printers"
 )
 
 // KubeContextList names of contexts from kubeconfig
@@ -104,9 +107,10 @@ func (kc *KubeCluster) KubeNamespaceList(ctx context.Context) ([]string, error) 
 }
 
 type ResourceTable struct {
-	APIResource metav1.APIResource `json:"apiResource"`
-	Table       *metav1.Table      `json:"table"`
-	IsError     bool               `json:"isError"`
+	APIResource   metav1.APIResource `json:"apiResource"`
+	Table         *metav1.Table      `json:"table"`
+	IsError       bool               `json:"isError"`
+	TableRowNames []string           `json:"tableRowNames"`
 }
 
 func (kc *KubeCluster) Query(ctx context.Context, nsName string, query string) ([]ResourceTable, error) {
@@ -115,14 +119,35 @@ func (kc *KubeCluster) Query(ctx context.Context, nsName string, query string) (
 	log.Infof("matches %v", util.Map(matches, func(ar metav1.APIResource) string { return ar.Kind }))
 
 	results := util.Map(matches, func(r metav1.APIResource) ResourceTable {
-		table, err := kc.ListResource(r, nsName)
+		table, err := kc.ListResource(ctx, r, nsName)
 		if err != nil {
 			log.Errorf("ListResource error for resource %+v: %w", r, err)
 			table = PrintError(err)
 		}
+
+		// Get a list of metadata.name for the object represented by each row. Ideally this would come from
+		// Table.Rows[]Object but I'm not sure how to specify the includeObject policy or decode the RawExtension
+		// instance.
+		nameIdx := -1
+		for i, cd := range table.ColumnDefinitions {
+			if strings.ToLower(cd.Name) == "name" && cd.Type == "string" {
+				nameIdx = i
+			}
+		}
+		rowNames := make([]string, len(table.Rows))
+		for i, row := range table.Rows {
+			if nameIdx > -1 {
+				rowNames[i] = row.Cells[nameIdx].(string)
+			} else {
+				rowNames[i] = ""
+			}
+		}
+
 		return ResourceTable{
-			APIResource: r,
-			Table:       table,
+			APIResource:   r,
+			Table:         table,
+			IsError:       err != nil,
+			TableRowNames: rowNames,
 		}
 	})
 
@@ -169,6 +194,37 @@ func (kc *KubeCluster) Describe(ctx context.Context, nsName string, kind string,
 		}
 
 		return describer.Describe(nsName, resourceName, describe.DescriberSettings{ShowEvents: true, ChunkSize: 5})
+	}
+
+	return "", fmt.Errorf("no resources found matching %s", kind)
+}
+
+func (kc *KubeCluster) Yaml(ctx context.Context, nsName string, kind string, resourceName string) (string, error) {
+	matches := findAPIResources(kc.apiResources, kind)
+
+	for _, apiResource := range matches {
+		gvk := toGVK(apiResource)
+
+		unst, err := kc.getResource(ctx, apiResource, nsName, resourceName)
+		if err != nil {
+			return "", fmt.Errorf("unable to getResource %v %s %s", gvk, nsName, resourceName)
+		}
+
+		obj, err := kc.scheme.New(gvk)
+		if err != nil {
+			return "", fmt.Errorf("unable to instantiate %s when yamling %s %s %s", gvk, nsName, kind, resourceName)
+		}
+
+		err = kc.scheme.Convert(unst, obj, nil)
+		if err != nil {
+			return "", err
+		}
+
+		yamlPrinter := objprinter.NewTypeSetter(kc.scheme).ToPrinter(&objprinter.YAMLPrinter{})
+		out := &bytes.Buffer{}
+		yamlPrinter.PrintObj(obj, out)
+		log.Infof(out.String())
+		return out.String(), nil
 	}
 
 	return "", fmt.Errorf("no resources found matching %s", kind)
@@ -274,13 +330,13 @@ func isSubresource(r metav1.APIResource) bool {
 	return strings.Contains(r.Name, "/")
 }
 
-func (kc *KubeCluster) ListResource(r metav1.APIResource, namespace string) (*metav1.Table, error) {
+func (kc *KubeCluster) ListResource(ctx context.Context, r metav1.APIResource, namespace string) (*metav1.Table, error) {
 	var uList *unstructured.UnstructuredList
 	var err error
 	if r.Namespaced {
-		uList, err = kc.dynamicClient.Resource(toGVR(r)).Namespace(namespace).List(context.TODO(), metav1.ListOptions{Limit: 1})
+		uList, err = kc.dynamicClient.Resource(toGVR(r)).Namespace(namespace).List(ctx, metav1.ListOptions{Limit: 10})
 	} else {
-		uList, err = kc.dynamicClient.Resource(toGVR(r)).List(context.TODO(), metav1.ListOptions{Limit: 1})
+		uList, err = kc.dynamicClient.Resource(toGVR(r)).List(ctx, metav1.ListOptions{Limit: 10})
 	}
 	if err != nil {
 		return nil, fmt.Errorf("dynamicClient list failed for %+v: %w", r, err)
@@ -289,16 +345,20 @@ func (kc *KubeCluster) ListResource(r metav1.APIResource, namespace string) (*me
 	return PrintList(kc.scheme, r, uList)
 }
 
-func hasAnyLower(t0 string, args ...[]string) bool {
-	target := strings.ToLower(t0)
-	for _, ts := range args {
-		for _, t := range ts {
-			if strings.ToLower(t) == target {
-				return true
-			}
+func (kc *KubeCluster) getResource(ctx context.Context, r metav1.APIResource, namespace string, name string) (*unstructured.Unstructured, error) {
+	namespacable := kc.dynamicClient.Resource(toGVR(r))
+
+	var ri dynamic.ResourceInterface
+	if r.Namespaced {
+		if namespace == "" {
+			return nil, fmt.Errorf("namespaced resource, but an empty namespace name: %s '%s'", toGVR(r), namespace)
 		}
+		ri = namespacable.Namespace(namespace)
+	} else {
+		ri = namespacable
 	}
-	return false
+
+	return ri.Get(ctx, name, metav1.GetOptions{})
 }
 
 func toGVR(r metav1.APIResource) schema.GroupVersionResource {

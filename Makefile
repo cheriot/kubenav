@@ -7,7 +7,7 @@ test:
 fmt:
 	go mod tidy
 	gofmt -w .
-	goimports --local github.com/cheriot/netpoltool/ -w .
+	goimports --local github.com/cheriot/ -w .
 
 run:
 	go run cmd/localserver/main.go
