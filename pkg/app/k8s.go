@@ -106,6 +106,93 @@ func (kc *KubeCluster) KubeNamespaceList(ctx context.Context) ([]string, error) 
 	}), nil
 }
 
+// Commands:
+// ctx
+// ns
+// ctx <name>
+// ns <name> (current ctx)
+// po (current ctx ns)
+// po <name>
+// <name> (current ctx ns kind)
+// thisiserr
+
+// The view needs:
+// responseType {Namespace, Ctx, List, Object, Error}
+// ctx
+// ns
+// kind
+// name
+// err
+type CommandResultType string
+
+const (
+	CRTContext = "ctx"
+	CRTQuery   = "query"
+	CRTObject  = "obj"
+	CRTError   = "err"
+)
+
+type CommandResult struct {
+	CommandResultType `json:"commandResultType"`
+	Namespace         string `json:"ns"`
+	Kind              string `json:"kind"`
+	Query             string `json:"query"`
+	Name              string `json:"name"`
+	ErrorMsg          string `json:"error"`
+}
+
+func ErrorCommandResult(errorMsg string) CommandResult {
+	return CommandResult{
+		CommandResultType: CRTError,
+		ErrorMsg:          errorMsg,
+	}
+}
+
+func (kc *KubeCluster) Command(ctx context.Context, ns string, query string, cmd string) CommandResult {
+	result := CommandResult{
+		Namespace: ns,
+		Query:     query,
+	}
+
+	fields := strings.Fields(strings.TrimSpace(cmd))
+	if len(fields) == 0 {
+		return ErrorCommandResult("empty command")
+	}
+
+	action := fields[0]
+	if action == "ctx" || action == "context" {
+		// ctx (context selection page)
+		// ctx somename (change context)
+		result.CommandResultType = CRTContext
+		if len(fields) > 1 {
+			// TODO validate this is a valid context name
+			result.Name = fields[1]
+		}
+		return result
+	}
+
+	actionMatches := findAPIResources(kc.apiResources, action)
+	if len(actionMatches) == 0 {
+		return ErrorCommandResult(fmt.Sprintf("unkown command or resource '%s' in '%s'", action, cmd))
+	}
+
+	apiResource := actionMatches[0]
+	result.Kind = apiResource.Kind
+
+	if len(fields) > 1 {
+		// ns somename
+		result.CommandResultType = CRTObject
+		result.Name = fields[1]
+		return result
+	}
+
+	// po
+	// ns
+	result.CommandResultType = CRTQuery
+	result.Query = action
+	return result
+}
+
 type ResourceTable struct {
 	APIResource   metav1.APIResource `json:"apiResource"`
 	Table         *metav1.Table      `json:"table"`
@@ -119,9 +206,9 @@ func (kc *KubeCluster) Query(ctx context.Context, nsName string, query string) (
 	log.Infof("matches %v", util.Map(matches, func(ar metav1.APIResource) string { return ar.Kind }))
 
 	results := util.Map(matches, func(r metav1.APIResource) ResourceTable {
-		table, err := kc.ListResource(ctx, r, nsName)
+		table, err := kc.listResource(ctx, r, nsName)
 		if err != nil {
-			log.Errorf("ListResource error for resource %+v: %w", r, err)
+			log.Errorf("listResource error for resource %+v: %w", r, err)
 			table = PrintError(err)
 		}
 
@@ -167,6 +254,7 @@ func findAPIResources(apiResources []metav1.APIResource, identifier string) []me
 			strings.ToLower(r.SingularName),
 		}
 		names = append(names, r.Categories...)
+		names = append(names, r.ShortNames...)
 		return util.Contains(names, strings.ToLower(identifier))
 	}
 
@@ -330,7 +418,7 @@ func isSubresource(r metav1.APIResource) bool {
 	return strings.Contains(r.Name, "/")
 }
 
-func (kc *KubeCluster) ListResource(ctx context.Context, r metav1.APIResource, namespace string) (*metav1.Table, error) {
+func (kc *KubeCluster) listResource(ctx context.Context, r metav1.APIResource, namespace string) (*metav1.Table, error) {
 	var uList *unstructured.UnstructuredList
 	var err error
 	if r.Namespaced {
