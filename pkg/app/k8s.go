@@ -238,11 +238,7 @@ func (kc *KubeCluster) Query(ctx context.Context, nsName string, query string) (
 		}
 	})
 
-	nonempty := util.Filter(results, func(rt ResourceTable) bool {
-		return len(rt.Table.Rows) > 0
-	})
-
-	return nonempty, nil
+	return results, nil
 }
 
 func findAPIResources(apiResources []metav1.APIResource, identifier string) []metav1.APIResource {
