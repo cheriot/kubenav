@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubectl/pkg/describe"
 
 	objprinter "k8s.io/cli-runtime/pkg/printers"
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
 // KubeContextList names of contexts from kubeconfig
@@ -343,11 +344,11 @@ func apiResources(restClientConfig *restclient.Config) ([]metav1.APIResource, er
 
 	client, err := discovery.NewDiscoveryClientForConfig(restClientConfig)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to create new discovery client for config: %w", err)
 	}
 	groups, resourceLists, err := client.ServerGroupsAndResources()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to get server groups and resources: %w", err)
 	}
 	// APIVersion == group/version
 
