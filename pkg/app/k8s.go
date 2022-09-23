@@ -239,7 +239,13 @@ func (kc *KubeCluster) Query(ctx context.Context, nsName string, query string) (
 		}
 	})
 
-	return results, nil
+	// Maintain order of the results, but move empty tables to the end
+	nonEmpty, empty := util.Partition(results, func(r ResourceTable) bool {
+		return len(r.Table.Rows) > 0
+	})
+	orderedResults := append(nonEmpty, empty...)
+
+	return orderedResults, nil
 }
 
 func findAPIResources(apiResources []metav1.APIResource, identifier string) []metav1.APIResource {
