@@ -44,7 +44,7 @@ type KubeCluster struct {
 	name             string
 	restClientConfig *restclient.Config
 	apiResources     []metav1.APIResource
-	scheme           *runtime.Scheme // Could be global
+	scheme           *runtime.Scheme // Could be global since it's go types?
 	dynamicClient    dynamic.Interface
 }
 
@@ -271,11 +271,22 @@ func (kc *KubeCluster) Describe(ctx context.Context, nsName string, kind string,
 
 		describer, found := describe.DescriberFor(toGK(apiResource), kc.restClientConfig)
 		if !found {
-			var restMapper meta.RESTMapper
-			restMapper = meta.NewDefaultRESTMapper(kc.scheme.PreferredVersionAllGroups()) // Maybe use PrioritizedVersion..?
+			var restMapper *meta.DefaultRESTMapper
+			if kc.scheme.IsGroupRegistered(apiResource.Group) {
+				restMapper = meta.NewDefaultRESTMapper(kc.scheme.PrioritizedVersionsAllGroups())
+			} else {
+				restMapper = meta.NewDefaultRESTMapper([]schema.GroupVersion{toGV(apiResource)})
+				scope := meta.RESTScopeNamespace
+				if !apiResource.Namespaced {
+					scope = meta.RESTScopeRoot
+				}
+
+				restMapper.Add(toGVK(apiResource), scope)
+			}
+
 			restMapping, err := restMapper.RESTMapping(toGK(apiResource))
 			if err != nil {
-				return "", err
+				return "", fmt.Errorf("no RESTMapping for %v: %w", toGK(apiResource), err)
 			}
 
 			describer, found = describe.GenericDescriberFor(restMapping, kc.restClientConfig)
