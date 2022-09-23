@@ -1,13 +1,13 @@
 package app
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
 
 	util "github.com/cheriot/kubenav/internal/util"
+	"gopkg.in/yaml.v3"
 
 	log "github.com/sirupsen/logrus"
 
@@ -25,7 +25,6 @@ import (
 	"k8s.io/client-go/util/homedir"
 	"k8s.io/kubectl/pkg/describe"
 
-	objprinter "k8s.io/cli-runtime/pkg/printers"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
@@ -312,21 +311,37 @@ func (kc *KubeCluster) Yaml(ctx context.Context, nsName string, kind string, res
 			return "", fmt.Errorf("unable to getResource %v %s %s", gvk, nsName, resourceName)
 		}
 
-		obj, err := kc.scheme.New(gvk)
-		if err != nil {
-			return "", fmt.Errorf("unable to instantiate %s when yamling %s %s %s", gvk, nsName, kind, resourceName)
+		// None of this managedFields nonsense
+		if untyped, ok := unst.Object["metadata"]; ok {
+			if md, ok := untyped.(map[string]interface{}); ok {
+				delete(md, "managedFields")
+			}
 		}
 
-		err = kc.scheme.Convert(unst, obj, nil)
+		bs, err := yaml.Marshal(&unst.Object)
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("unable to marshal unstructured: %w", err)
 		}
 
-		yamlPrinter := objprinter.NewTypeSetter(kc.scheme).ToPrinter(&objprinter.YAMLPrinter{})
-		out := &bytes.Buffer{}
-		yamlPrinter.PrintObj(obj, out)
-		log.Infof(out.String())
-		return out.String(), nil
+		return string(bs), nil
+
+		// *** The code below is probably useless. HOWEVER, https://pkg.go.dev/k8s.io/client-go/util/jsonpath looks useful
+		// for a future jsonpath tool live editor.
+
+		// What's the point of "k8s.io/cli-runtime/pkg/printers"?
+		// obj, err := kc.scheme.New(gvk)
+		// if err != nil {
+		// 	return "", fmt.Errorf("unable to instantiate %s when yamling %s %s %s", gvk, nsName, kind, resourceName)
+		// }
+		// err = kc.scheme.Convert(unst, obj, nil)
+		// if err != nil {
+		// 	return "", err
+		// }
+		// yamlPrinter := objprinter.NewTypeSetter(kc.scheme).ToPrinter(&objprinter.YAMLPrinter{})
+		// out := &bytes.Buffer{}
+		// yamlPrinter.PrintObj(obj, out)
+		// log.Infof(out.String())
+		// return out.String(), nil
 	}
 
 	return "", fmt.Errorf("no resources found matching %s", kind)
