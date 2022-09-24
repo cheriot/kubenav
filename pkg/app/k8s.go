@@ -69,7 +69,7 @@ func NewKubeCluster(ctx context.Context, kubeCtxName string) (*KubeCluster, erro
 		return nil, fmt.Errorf("error creating dynamicClient: %w", err)
 	}
 
-	apiResource, err := apiResources(restClientConfig)
+	apiResource, err := fetchAllApiResources(restClientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error getting api-resources: %w", err)
 	}
@@ -352,7 +352,7 @@ func ApiResources(kubeconfigOverride string) ([]metav1.APIResource, error) {
 	if err != nil {
 		return nil, err
 	}
-	return apiResources(config)
+	return fetchAllApiResources(config)
 }
 
 func Describe(ns string, kind string, name string) (string, error) {
@@ -369,10 +369,11 @@ func Describe(ns string, kind string, name string) (string, error) {
 	return kc.Describe(context.TODO(), ns, kind, name)
 }
 
-func apiResources(restClientConfig *restclient.Config) ([]metav1.APIResource, error) {
+func fetchAllApiResources(restClientConfig *restclient.Config) ([]metav1.APIResource, error) {
 	// Should this use runtime.Scheme or RESTMapper???
 	// https://iximiuz.com/en/posts/kubernetes-api-structure-and-terminology/
 	// https://iximiuz.com/en/posts/kubernetes-api-go-types-and-common-machinery/
+	log.Infof("fetchAllApiResources **Expensive**")
 
 	client, err := discovery.NewDiscoveryClientForConfig(restClientConfig)
 	if err != nil {
@@ -414,9 +415,6 @@ func apiResources(restClientConfig *restclient.Config) ([]metav1.APIResource, er
 		}
 	}
 
-	// for _, r := range apiResources {
-	// 	fmt.Printf("%+v\n", r)
-	// }
 	return apiResources, nil
 }
 
@@ -429,7 +427,7 @@ func splitGroupVersion(groupVersion string) (string, string, error) {
 		// core resources like Pod are just v1 with no group.
 		return "", groupVersion, nil
 	}
-	return "", "", fmt.Errorf("Unexpected GroupVersion format %s", groupVersion)
+	return "", "", fmt.Errorf("unexpected GroupVersion format %s", groupVersion)
 }
 
 func readConfig(kubeconfigOverride string) (*restclient.Config, error) {
@@ -447,13 +445,15 @@ func isSubresource(r metav1.APIResource) bool {
 	return strings.Contains(r.Name, "/")
 }
 
+const LIST_LIMIT = 1000
+
 func (kc *KubeCluster) listResource(ctx context.Context, r metav1.APIResource, namespace string) (*metav1.Table, error) {
 	var uList *unstructured.UnstructuredList
 	var err error
 	if r.Namespaced {
-		uList, err = kc.dynamicClient.Resource(toGVR(r)).Namespace(namespace).List(ctx, metav1.ListOptions{Limit: 10})
+		uList, err = kc.dynamicClient.Resource(toGVR(r)).Namespace(namespace).List(ctx, metav1.ListOptions{Limit: LIST_LIMIT})
 	} else {
-		uList, err = kc.dynamicClient.Resource(toGVR(r)).List(ctx, metav1.ListOptions{Limit: 10})
+		uList, err = kc.dynamicClient.Resource(toGVR(r)).List(ctx, metav1.ListOptions{Limit: LIST_LIMIT})
 	}
 	if err != nil {
 		return nil, fmt.Errorf("dynamicClient list failed for %+v: %w", r, err)
