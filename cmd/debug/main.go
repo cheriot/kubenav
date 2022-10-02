@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
@@ -41,14 +43,29 @@ func (c *GetCommand) Execute(args []string) error {
 type RelationsCommand struct{}
 
 func (c *RelationsCommand) Execute(_ []string) error {
-	pod := &corev1.Pod{}
-	pod.Spec.NodeName = "fakeNodeName"
+	// pod := &corev1.Pod{}
+	// pod.Spec.NodeName = "fakeNodeName"
 	// ns := &corev1.Namespace{}
+	rs := &appsv1.ReplicaSet{}
+
+	// ownerReferences:
+	// - apiVersion: apps/v1
+	//   blockOwnerDeletion: true
+	//   controller: true
+	//   kind: Deployment
+	//   name: hello-server
+	//   uid: 456996f4-f01e-4aee-b214-6c7984d786fc
+	rs.GetObjectMeta().SetOwnerReferences([]metav1.OwnerReference{{
+		APIVersion: "apps/v1",
+		Kind:       "Deployment",
+		Name:       "hello-server",
+		UID:        "456996f4-f01e-4aee-b214-6c7984d786fc",
+	}})
+
 	scheme := runtime.NewScheme()
 	corev1.AddToScheme(scheme)
-	fmt.Printf("%+v\n", pod.GetObjectKind().GroupVersionKind())
 
-	hors := relations.RelationsList(pod, schema.GroupKind{Group: "", Kind: "Pod"})
+	hors := relations.RelationsList(rs, schema.GroupKind{Group: "apps", Kind: "ReplicaSet"})
 
 	fmt.Printf("Found %d relations", len(hors))
 	for _, hor := range hors {

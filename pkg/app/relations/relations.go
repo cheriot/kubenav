@@ -38,8 +38,9 @@ func BuildRelations() []HasOneRelation {
 	podGK := objectKind(&corev1.Pod{}, scheme)
 	nodeGK := objectKind(&corev1.Node{}, scheme)
 	rsGK := objectKind(&appsv1.ReplicaSet{}, scheme)
+	deploymentGK := objectKind(&appsv1.Deployment{}, scheme)
 
-	var podNode = HasOneRelation{
+	var podHasOneNode = HasOneRelation{
 		Origin:      podGK,
 		Destination: nodeGK,
 		IsApplicable: func(origin runtime.Object) bool {
@@ -55,7 +56,7 @@ func BuildRelations() []HasOneRelation {
 		},
 	}
 
-	var podReplicaSet = HasOneRelation{
+	var podHasOneReplicaSet = HasOneRelation{
 		// https://kubernetes.io/docs/concepts/overview/working-with-objects/owners-dependents/
 		// ownerReferences:
 		//   - apiVersion: apps/v1
@@ -83,7 +84,27 @@ func BuildRelations() []HasOneRelation {
 		},
 	}
 
-	return []HasOneRelation{podNode, podReplicaSet}
+	var rsHasOneDeployment = HasOneRelation{
+		Origin:      rsGK,
+		Destination: deploymentGK,
+		IsApplicable: func(origin runtime.Object) bool {
+			rs := origin.(*appsv1.ReplicaSet)
+
+			return nil != ownerByGK(rs.OwnerReferences, deploymentGK)
+		},
+		IdentifyDestination: func(origin runtime.Object) HasOneDestination {
+			rs := origin.(*appsv1.ReplicaSet)
+			or := ownerByGK(rs.OwnerReferences, deploymentGK)
+
+			return HasOneDestination{
+				GroupKind: deploymentGK,
+				Namespace: rs.Namespace,
+				Name:      or.Name,
+			}
+		},
+	}
+
+	return []HasOneRelation{podHasOneNode, podHasOneReplicaSet, rsHasOneDeployment}
 }
 
 func objectKind(obj runtime.Object, scheme *runtime.Scheme) schema.GroupKind {
