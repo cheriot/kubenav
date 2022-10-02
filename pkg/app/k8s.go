@@ -6,8 +6,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	util "github.com/cheriot/kubenav/internal/util"
 	"gopkg.in/yaml.v3"
+
+	util "github.com/cheriot/kubenav/internal/util"
+	"github.com/cheriot/kubenav/pkg/app/relations"
 
 	log "github.com/sirupsen/logrus"
 
@@ -263,6 +265,64 @@ func findAPIResources(apiResources []metav1.APIResource, identifier string) []me
 	return util.Filter(apiResources, isMatch)
 }
 
+type KubeObject struct {
+	Relations []relations.HasOneDestination `json:"relations"`
+	Describe  string                        `json:"describe"`
+	Yaml      string                        `json:"yaml"`
+	Errors    []error                       `json:"errors"`
+}
+
+func (kc *KubeCluster) GetResource(ctx context.Context, nsName string, kind string, resourceName string) (*KubeObject, error) {
+	errors := make([]error, 0)
+	matches := findAPIResources(kc.apiResources, kind)
+	if len(matches) == 0 {
+		return nil, fmt.Errorf("unable to find an api resource: %s", kind)
+	}
+
+	apiResource := matches[0]
+	if len(matches) > 1 {
+		errors = append(errors, fmt.Errorf("found more APIResource matches than expected, %d, for GetKubeObject %+v", len(matches), matches))
+	}
+
+	unstructured, err := kc.getResource(ctx, apiResource, nsName, resourceName)
+	if err != nil {
+		return nil, fmt.Errorf("unable to GetKubeObject: %w", err)
+	}
+
+	yamlStr, err := renderYaml(unstructured)
+	if err != nil {
+		errors = append(errors, fmt.Errorf("unable to serialize yaml: %w", err))
+	}
+
+	describeStr, err := kc.Describe(ctx, nsName, kind, resourceName)
+	if err != nil {
+		errors = append(errors, fmt.Errorf("unable to describe: %w", err))
+	}
+
+	rs := make([]relations.HasOneDestination, 0)
+	if kc.scheme.IsGroupRegistered(apiResource.Group) {
+		gvk := toGVK(apiResource)
+		obj, err := kc.scheme.New(gvk)
+		if err != nil {
+			errors = append(errors, fmt.Errorf("unable to instantiate %s when yamling %s %s %s", gvk, nsName, kind, resourceName))
+		} else {
+
+			err = kc.scheme.Convert(unstructured, obj, nil)
+			if err != nil {
+				errors = append(errors, fmt.Errorf("unable to convert: %w", err))
+			}
+			rs = relations.RelationsList(obj, toGK(apiResource))
+		}
+	}
+
+	return &KubeObject{
+		Relations: rs,
+		Yaml:      yamlStr,
+		Describe:  describeStr,
+		Errors:    errors,
+	}, nil
+}
+
 func (kc *KubeCluster) Describe(ctx context.Context, nsName string, kind string, resourceName string) (string, error) {
 	matches := findAPIResources(kc.apiResources, kind)
 
@@ -300,6 +360,22 @@ func (kc *KubeCluster) Describe(ctx context.Context, nsName string, kind string,
 	return "", fmt.Errorf("no resources found matching %s", kind)
 }
 
+func renderYaml(unstructured *unstructured.Unstructured) (string, error) {
+	// None of this managedFields nonsense
+	if untyped, ok := unstructured.Object["metadata"]; ok {
+		if md, ok := untyped.(map[string]interface{}); ok {
+			delete(md, "managedFields")
+		}
+	}
+
+	bs, err := yaml.Marshal(&unstructured.Object)
+	if err != nil {
+		return "", fmt.Errorf("unable to marshal unstructured: %w", err)
+	}
+
+	return string(bs), nil
+}
+
 func (kc *KubeCluster) Yaml(ctx context.Context, nsName string, kind string, resourceName string) (string, error) {
 	matches := findAPIResources(kc.apiResources, kind)
 
@@ -311,37 +387,7 @@ func (kc *KubeCluster) Yaml(ctx context.Context, nsName string, kind string, res
 			return "", fmt.Errorf("unable to getResource %v %s %s", gvk, nsName, resourceName)
 		}
 
-		// None of this managedFields nonsense
-		if untyped, ok := unst.Object["metadata"]; ok {
-			if md, ok := untyped.(map[string]interface{}); ok {
-				delete(md, "managedFields")
-			}
-		}
-
-		bs, err := yaml.Marshal(&unst.Object)
-		if err != nil {
-			return "", fmt.Errorf("unable to marshal unstructured: %w", err)
-		}
-
-		return string(bs), nil
-
-		// *** The code below is probably useless. HOWEVER, https://pkg.go.dev/k8s.io/client-go/util/jsonpath looks useful
-		// for a future jsonpath tool live editor.
-
-		// What's the point of "k8s.io/cli-runtime/pkg/printers"?
-		// obj, err := kc.scheme.New(gvk)
-		// if err != nil {
-		// 	return "", fmt.Errorf("unable to instantiate %s when yamling %s %s %s", gvk, nsName, kind, resourceName)
-		// }
-		// err = kc.scheme.Convert(unst, obj, nil)
-		// if err != nil {
-		// 	return "", err
-		// }
-		// yamlPrinter := objprinter.NewTypeSetter(kc.scheme).ToPrinter(&objprinter.YAMLPrinter{})
-		// out := &bytes.Buffer{}
-		// yamlPrinter.PrintObj(obj, out)
-		// log.Infof(out.String())
-		// return out.String(), nil
+		return renderYaml(unst)
 	}
 
 	return "", fmt.Errorf("no resources found matching %s", kind)

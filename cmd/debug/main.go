@@ -4,7 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+
 	"github.com/cheriot/kubenav/pkg/app"
+	"github.com/cheriot/kubenav/pkg/app/relations"
 
 	flags "github.com/jessevdk/go-flags"
 )
@@ -30,6 +35,26 @@ func (c *GetCommand) Execute(args []string) error {
 	if err != nil {
 		panic(fmt.Sprintf("Unable to complete get command: %s", err.Error()))
 	}
+	return nil
+}
+
+type RelationsCommand struct{}
+
+func (c *RelationsCommand) Execute(_ []string) error {
+	pod := &corev1.Pod{}
+	pod.Spec.NodeName = "fakeNodeName"
+	// ns := &corev1.Namespace{}
+	scheme := runtime.NewScheme()
+	corev1.AddToScheme(scheme)
+	fmt.Printf("%+v\n", pod.GetObjectKind().GroupVersionKind())
+
+	hors := relations.RelationsList(pod, schema.GroupKind{Group: "", Kind: "Pod"})
+
+	fmt.Printf("Found %d relations", len(hors))
+	for _, hor := range hors {
+		fmt.Printf("%+v", hor)
+	}
+
 	return nil
 }
 
@@ -91,6 +116,12 @@ func BuildParser(appOptions *ApplicationOptions) (*flags.Parser, error) {
 
 	describeDesc := "Describe the state of an object."
 	_, err = parser.AddCommand("describe", describeDesc, describeDesc, &DescribeCommand{})
+	if err != nil {
+		return nil, err
+	}
+
+	relDesc := "Relations of an object."
+	_, err = parser.AddCommand("relations", relDesc, relDesc, &RelationsCommand{})
 	if err != nil {
 		return nil, err
 	}
