@@ -6,7 +6,10 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/cheriot/kubenav/internal/util"
 
 	// rbacv1 "k8s.io/api/rbac/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -17,46 +20,57 @@ import (
 // kubectl get pods --all-namespaces -o wide --field-selector spec.nodeName=<node>
 // https://stackoverflow.com/questions/39231880/kubernetes-api-get-pods-on-specific-nodes
 
-// * transitive relations
+// hasOne (origin has a name):
+//   * pod has one node
+//   * [cluster]rolebinding roleRef
+//   * ingress ingressClass
+// hasList (origin has a list of names):
+//   * owner references
+//   * [cluster]rolebinding subjects
+// hasSearch (label selectors)
+//   * service matches pods
+//   * netpols
+//   * reverse of hasOne and hasList
+// transitive relations
 //   * deployment to pods
 //   * ingress to pods
 
 // Operations
 // 1. current object -> list of {GroupKind, (search params | object [namespace] name)}
 // 2. search page query params -> list of resources
-type Relatable interface {
-	runtime.Object
-}
 
 var relations = BuildRelations()
 
-func BuildRelations() []HasOneRelation {
+func BuildRelations() []HasReferenceRelation {
 	scheme := runtime.NewScheme()
 	corev1.AddToScheme(scheme)
 	appsv1.AddToScheme(scheme)
+	rbacv1.AddToScheme(scheme)
 
 	podGK := objectKind(&corev1.Pod{}, scheme)
 	nodeGK := objectKind(&corev1.Node{}, scheme)
 	rsGK := objectKind(&appsv1.ReplicaSet{}, scheme)
-	deploymentGK := objectKind(&appsv1.Deployment{}, scheme)
+	// deploymentGK := objectKind(&appsv1.Deployment{}, scheme)
+	rGK := objectKind(&rbacv1.Role{}, scheme)
+	rbGK := objectKind(&rbacv1.RoleBinding{}, scheme)
+	crbGK := objectKind(&rbacv1.ClusterRoleBinding{}, scheme)
+	crGK := objectKind(&rbacv1.ClusterRole{}, scheme)
 
-	var podHasOneNode = HasOneRelation{
-		Origin:      podGK,
-		Destination: nodeGK,
-		IsApplicable: func(origin runtime.Object) bool {
+	var podHasOneNode = HasReferenceRelation{
+		Origin: podGK,
+		Destinations: func(origin runtime.Object) ([]RelationDestination, bool) {
 			pod := origin.(*corev1.Pod)
-			return pod.Spec.NodeName != ""
-		},
-		IdentifyDestination: func(origin runtime.Object) HasOneDestination {
-			pod := origin.(*corev1.Pod)
-			return HasOneDestination{
+			if pod.Spec.NodeName == "" {
+				return nil, false
+			}
+			return []RelationDestination{{
 				GroupKind: nodeGK,
 				Name:      pod.Spec.NodeName,
-			}
+			}}, true
 		},
 	}
 
-	var podHasOneReplicaSet = HasOneRelation{
+	var podHasOwners = HasReferenceRelation{
 		// https://kubernetes.io/docs/concepts/overview/working-with-objects/owners-dependents/
 		// ownerReferences:
 		//   - apiVersion: apps/v1
@@ -65,46 +79,112 @@ func BuildRelations() []HasOneRelation {
 		//     kind: ReplicaSet
 		//     name: frontend
 		//     uid: f391f6db-bb9b-4c09-ae74-6a1f77f3d5cf
-		Origin:      podGK,
-		Destination: rsGK,
-		IsApplicable: func(origin runtime.Object) bool {
-			pod := origin.(*corev1.Pod)
-
-			return nil != ownerByGK(pod.OwnerReferences, rsGK)
-		},
-		IdentifyDestination: func(origin runtime.Object) HasOneDestination {
-			pod := origin.(*corev1.Pod)
-
-			or := ownerByGK(pod.OwnerReferences, rsGK)
-			return HasOneDestination{
-				GroupKind: rsGK,
-				Namespace: pod.Namespace,
-				Name:      or.Name,
+		Origin: podGK,
+		Destinations: func(origin runtime.Object) ([]RelationDestination, bool) {
+			pod, isPod := origin.(*corev1.Pod)
+			if !isPod {
+				return nil, false
 			}
+			rds := ownerDestinations(pod.GetNamespace(), pod.GetOwnerReferences())
+			return rds, len(rds) != 0
 		},
 	}
 
-	var rsHasOneDeployment = HasOneRelation{
-		Origin:      rsGK,
-		Destination: deploymentGK,
-		IsApplicable: func(origin runtime.Object) bool {
-			rs := origin.(*appsv1.ReplicaSet)
-
-			return nil != ownerByGK(rs.OwnerReferences, deploymentGK)
-		},
-		IdentifyDestination: func(origin runtime.Object) HasOneDestination {
-			rs := origin.(*appsv1.ReplicaSet)
-			or := ownerByGK(rs.OwnerReferences, deploymentGK)
-
-			return HasOneDestination{
-				GroupKind: deploymentGK,
-				Namespace: rs.Namespace,
-				Name:      or.Name,
+	var rsHasOwners = HasReferenceRelation{
+		Origin: rsGK,
+		Destinations: func(origin runtime.Object) ([]RelationDestination, bool) {
+			rs, isRs := origin.(*appsv1.ReplicaSet)
+			if !isRs {
+				return nil, false
 			}
+			rds := ownerDestinations(rs.GetNamespace(), rs.GetOwnerReferences())
+			return rds, len(rds) != 0
 		},
 	}
 
-	return []HasOneRelation{podHasOneNode, podHasOneReplicaSet, rsHasOneDeployment}
+	var roleBindingHasOneRole = HasReferenceRelation{
+		Origin: rbGK,
+		Destinations: func(origin runtime.Object) ([]RelationDestination, bool) {
+			rb := origin.(*rbacv1.RoleBinding)
+			if rb.RoleRef.Kind == "" || rb.RoleRef.Name == "" {
+				return nil, false
+			}
+
+			// Can reference either a Role in the current namespace or a ClusterRole
+			if rb.RoleRef.Kind == rGK.Kind {
+				return []RelationDestination{{
+					GroupKind: rGK,
+					Namespace: rb.Namespace,
+					Name:      rb.RoleRef.Name,
+				}}, true
+			}
+
+			return []RelationDestination{{
+				GroupKind: crGK,
+				Namespace: "", // cluster scope
+				Name:      rb.RoleRef.Name,
+			}}, true
+		},
+	}
+
+	var roleBindingHasSubjects = HasReferenceRelation{
+		Origin: rbGK,
+		Destinations: func(origin runtime.Object) ([]RelationDestination, bool) {
+			rb := origin.(*rbacv1.RoleBinding)
+
+			rds := subjectDestinations(rb.Subjects)
+			return rds, len(rds) > 0
+		},
+	}
+
+	var clusterRoleBindingHasOneRole = HasReferenceRelation{
+		Origin: crbGK,
+		Destinations: func(origin runtime.Object) ([]RelationDestination, bool) {
+			crb := origin.(*rbacv1.ClusterRoleBinding)
+			if crb.RoleRef.Kind == "" || crb.RoleRef.Name == "" {
+				return nil, false
+			}
+
+			return []RelationDestination{{
+				GroupKind: crGK,
+				Namespace: "", // cluster scope
+				Name:      crb.RoleRef.Name,
+			}}, true
+		},
+	}
+
+	var clusterRoleBindingHasSubjects = HasReferenceRelation{
+		Origin: crbGK,
+		Destinations: func(origin runtime.Object) ([]RelationDestination, bool) {
+			rb := origin.(*rbacv1.ClusterRoleBinding)
+
+			rds := subjectDestinations(rb.Subjects)
+			return rds, len(rds) > 0
+		},
+	}
+
+	return []HasReferenceRelation{
+		podHasOneNode,
+		podHasOwners,
+		rsHasOwners,
+		roleBindingHasOneRole,
+		roleBindingHasSubjects,
+		clusterRoleBindingHasOneRole,
+		clusterRoleBindingHasSubjects,
+	}
+}
+
+func subjectDestinations(subjects []rbacv1.Subject) []RelationDestination {
+	rds := make([]RelationDestination, 0)
+	for _, s := range subjects {
+		rds = append(rds, RelationDestination{
+			GroupKind: schema.GroupKind{Group: s.APIGroup, Kind: s.Kind},
+			Namespace: s.Namespace,
+			Name:      s.Name,
+		})
+	}
+
+	return rds
 }
 
 func objectKind(obj runtime.Object, scheme *runtime.Scheme) schema.GroupKind {
@@ -115,26 +195,34 @@ func objectKind(obj runtime.Object, scheme *runtime.Scheme) schema.GroupKind {
 	return gvks[0].GroupKind()
 }
 
-func RelationsList(origin Relatable, originGK schema.GroupKind) []HasOneDestination {
-	destinations := make([]HasOneDestination, 0)
+func RelationsList(origin runtime.Object, originGK schema.GroupKind) []RelationDestination {
+	destinations := make([]RelationDestination, 0)
 	for _, hor := range relations {
-		if hor.Origin == originGK && hor.IsApplicable(origin) {
-			destinations = append(destinations, hor.IdentifyDestination(origin))
+		if hor.Origin == originGK {
+			rds, ok := hor.Destinations(origin)
+			if ok {
+				destinations = append(destinations, rds...)
+			}
 		}
 	}
 
 	return destinations
 }
 
-func ReverseHasOneRelation(destination runtime.Object, ns string, sr HasOneRelation, possibleOrigins []runtime.Object) []runtime.Object {
-	d := HasOneDestination{
+func ReverseHasOneRelation(destination runtime.Object, ns string, sr HasReferenceRelation, possibleOrigins []runtime.Object) []runtime.Object {
+	d := RelationDestination{
 		GroupKind: objGK(destination),
 		Namespace: ns,
 	}
 
 	matches := make([]runtime.Object, 0)
 	for _, possibleOrigin := range possibleOrigins {
-		if sr.IsApplicable(possibleOrigin) && d == sr.IdentifyDestination(possibleOrigin) {
+		rds, ok := sr.Destinations(possibleOrigin)
+		util.Filter(rds, func(rd RelationDestination) bool {
+			// TODO will rd have an accurate Namespace?
+			return rd.GroupKind == d.GroupKind && rd.Name == d.Name
+		})
+		if ok {
 			matches = append(matches, possibleOrigin)
 		}
 	}
@@ -149,15 +237,15 @@ func ReverseHasOneRelation(destination runtime.Object, ns string, sr HasOneRelat
 //   * [cluster] role binding -> role
 
 // The Origin object  contains an identifier for the one and only Destination object it has this relationship with.
-type HasOneRelation struct {
-	Origin      schema.GroupKind `json:"origin"`
-	Destination schema.GroupKind `json:"destination"`
+type HasReferenceRelation struct {
+	Origin schema.GroupKind `json:"origin"`
 	// given the origin object, does it have this relation? Ex does a Service have a .spec.selector. Does a pod have an ownerReference?
-	IsApplicable        func(runtime.Object) bool              `json:"-"`
-	IdentifyDestination func(runtime.Object) HasOneDestination `json:"-"`
+	// IsApplicable        func(runtime.Object) bool                `json:"-"`
+	// IdentifyDestination func(runtime.Object) RelationDestination `json:"-"`
+	Destinations func(runtime.Object) ([]RelationDestination, bool) `json:"-"`
 }
 
-type HasOneDestination struct {
+type RelationDestination struct {
 	schema.GroupKind `json:"groupKind"`
 	Namespace        string `json:"namespace"`
 	Name             string `json:"name"`
@@ -183,20 +271,19 @@ type HasManyRelations struct {
 	QueryParams func(origin runtime.Object) map[string]string
 }
 
-var podNode = HasOneRelation{
-	Origin:      schema.GroupKind{Group: "", Kind: "Pod"},
-	Destination: schema.GroupKind{Group: "", Kind: "Node"},
-	IsApplicable: func(origin runtime.Object) bool {
-		pod := origin.(*corev1.Pod)
-		return pod.Spec.NodeName != ""
-	},
-	IdentifyDestination: func(origin runtime.Object) HasOneDestination {
-		pod := origin.(*corev1.Pod)
-		return HasOneDestination{
-			GroupKind: objGK(&corev1.Node{}),
-			Name:      pod.Spec.NodeName,
+func ownerDestinations(originNamespace string, ownerReferences []metav1.OwnerReference) []RelationDestination {
+	rrs := make([]RelationDestination, 0)
+	for _, or := range ownerReferences {
+		group := strings.Split(or.APIVersion, "/")
+		if len(group) > 0 {
+			rrs = append(rrs, RelationDestination{
+				GroupKind: schema.GroupKind{Group: group[0], Kind: or.Kind},
+				Namespace: originNamespace, // TODO Empty for cluster scope objects
+				Name:      or.Name,
+			})
 		}
-	},
+	}
+	return rrs
 }
 
 func ownerByGK(ownerReferences []metav1.OwnerReference, gk schema.GroupKind) *metav1.OwnerReference {
