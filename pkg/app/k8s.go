@@ -210,7 +210,7 @@ func (kc *KubeCluster) Query(ctx context.Context, nsName string, query string) (
 	results := util.Map(matches, func(r metav1.APIResource) ResourceTable {
 		table, err := kc.listResource(ctx, r, nsName)
 		if err != nil {
-			log.Errorf("listResource error for resource %+v: %w", r, err)
+			log.Errorf("listResource error for resource %+v: %s", r, err)
 			table = PrintError(err)
 		}
 
@@ -266,10 +266,10 @@ func findAPIResources(apiResources []metav1.APIResource, identifier string) []me
 }
 
 type KubeObject struct {
-	Relations []relations.HasOneDestination `json:"relations"`
-	Describe  string                        `json:"describe"`
-	Yaml      string                        `json:"yaml"`
-	Errors    []error                       `json:"errors"`
+	Relations []relations.RelationDestination `json:"relations"`
+	Describe  string                          `json:"describe"`
+	Yaml      string                          `json:"yaml"`
+	Errors    []error                         `json:"errors"`
 }
 
 func (kc *KubeCluster) GetResource(ctx context.Context, nsName string, kind string, resourceName string) (*KubeObject, error) {
@@ -299,7 +299,7 @@ func (kc *KubeCluster) GetResource(ctx context.Context, nsName string, kind stri
 		errors = append(errors, fmt.Errorf("unable to describe: %w", err))
 	}
 
-	rs := make([]relations.HasOneDestination, 0)
+	rs := make([]relations.RelationDestination, 0)
 	if kc.scheme.IsGroupRegistered(apiResource.Group) {
 		gvk := toGVK(apiResource)
 		obj, err := kc.scheme.New(gvk)
@@ -449,7 +449,7 @@ func fetchAllApiResources(restClientConfig *restclient.Config) ([]metav1.APIReso
 			for _, r := range rls.APIResources {
 				group, version, err := splitGroupVersion(rls.GroupVersion)
 				if err != nil {
-					log.Errorf("error splitting GroupVersion on %+v: %w", rls, err)
+					log.Errorf("error splitting GroupVersion on %+v: %s", rls, err)
 					continue
 				}
 				r.Group = group

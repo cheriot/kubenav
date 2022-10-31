@@ -8,6 +8,7 @@ fmt:
 	go mod tidy
 	gofmt -w .
 	goimports -local "github.com/cheriot/" -w .
+	go vet ./...
 
 run:
 	go run cmd/localserver/main.go

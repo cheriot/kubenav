@@ -18,7 +18,7 @@ func main() {
 	e.GET("/api/contexts", func(c echo.Context) error {
 		ctxNames, err := app.KubeContextList()
 		if err != nil {
-			log.Errorf("error from KubeContextList: %w", err)
+			log.Errorf("error from KubeContextList: %s", err)
 		}
 		return c.JSON(http.StatusOK, ctxNames)
 	})
@@ -29,12 +29,12 @@ func main() {
 
 		kc, err := app.GetOrMakeKubeCluster(ctx, ctxParam)
 		if err != nil {
-			log.Errorf("error getting kubecluster for %s: %w", ctxParam, err)
+			log.Errorf("error getting kubecluster for %s: %s", ctxParam, err)
 		}
 
 		nsNames, err := kc.KubeNamespaceList(ctx)
 		if err != nil {
-			log.Errorf("error from KubeNamespaceList: %w", err)
+			log.Errorf("error from KubeNamespaceList: %s", err)
 		}
 		return c.JSON(http.StatusOK, nsNames)
 	})
@@ -47,12 +47,12 @@ func main() {
 
 		kc, err := app.GetOrMakeKubeCluster(ctx, ctxParam)
 		if err != nil {
-			log.Errorf("error getting kubecluster for %s: %w", ctxParam, err)
+			log.Errorf("error getting kubecluster for %s: %s", ctxParam, err)
 		}
 
 		resourceTables, err := kc.Query(ctx, nsParam, queryParam)
 		if err != nil {
-			log.Errorf("error query %s for %s: %w", queryParam, ctxParam, err)
+			log.Errorf("error query %s for %s: %s", queryParam, ctxParam, err)
 		}
 
 		return c.JSON(http.StatusOK, resourceTables)
